@@ -45,7 +45,7 @@ Three terms used throughout:
    a terminal, in whatever folder you keep projects in:
 
    ```bash
-   git clone https://github.com/psych251/smith2016.git
+   git clone https://github.com/psych251/schapiro2013.git
    cd smith2016
    npm install
    ```
