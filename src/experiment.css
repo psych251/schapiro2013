@@ -9,3 +9,10 @@
 .framing .programs { margin: 1em 0; padding-left: 1.2em; }
 #jspsych-html-button-response-btngroup { text-align: center; }
 .thanks { text-align: center; }
+/* Schapiro et al. (2013) image stream. The frame is square and fixed in size so a rotated
+   image occupies exactly the same place as an upright one. */
+.stim-frame { width: 300px; height: 300px; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
+.stim { width: 300px; height: 300px; display: block; }
+.stim.rotated { transform: rotate(90deg); }
+.stim-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 1em 0; }
+.grid-stim { width: 100%; height: auto; display: block; }

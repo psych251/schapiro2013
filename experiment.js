@@ -1,20 +1,28 @@
 /*
- * Psych 251 experiment template: demo experiment.
+ * Replication of Schapiro, Rogers, Cordova, Turk-Browne & Botvinick (2013), Experiment 2:
+ * "Neural representations of events arise from temporal community structure".
  *
- * This file is the one you edit. It builds a jsPsych 8 timeline and wires it to DataSaver
- * (src/save.js), which writes to your Firebase project. Everything below is a working
- * example you can replace piece by piece:
+ * This file builds a jsPsych 8 timeline and wires it to DataSaver (src/save.js), which writes
+ * to your Firebase project. The graph and sequence generation live in src/graph.js.
  *
  *   1. consent           course-wide consent text (required at the start of every study)
  *   2. instructions
  *   3. demographics      a multi-question survey page (jsPsych "survey" plugin, SurveyJS)
- *   4. framing task      a between-subjects manipulation with random assignment
- *   5. lexical decision  a short keyboard reaction-time block (trial-level data)
+ *   4. exposure phase    all 15 images shown at once, then 1,400 images from a random walk on
+ *                        the community graph, 1.5 s each, no ISI. Cover task: press one key if
+ *                        the image is rotated 90 degrees (about 20% of trials), another if not.
+ *                        Beep at one pitch for a wrong key, another for no response in time.
+ *                        Self-paced break about every 7 minutes.
+ *   5. parsing phase     600 images, 1.5 s each: 40 blocks of 15, alternating random walk and
+ *                        one fixed Hamiltonian cycle per participant (entered next to where the
+ *                        walk ended, forward or backward at random). Press the spacebar at
+ *                        "natural breaking points".
  *   6. feedback          Likert + free text
  *   7. debrief           saves data, then shows thanks or redirects to Prolific
  *
- * The example manipulation is the classic "Asian disease" framing problem
- * (Tversky & Kahneman, 1981): people are risk-averse for gains and risk-seeking for losses.
+ * Stimuli (stimuli/stim-01.svg ... stim-15.svg) are generated stand-ins for the original
+ * ArtMatic Pro images; see scripts/make-stimuli.js. They are assigned to graph nodes at
+ * random for each participant.
  */
 
 // ---------------------------------------------------------------------------
@@ -24,16 +32,18 @@ window.TEMPLATE_VERSION = "0.1.0";
 
 const EXPERIMENT = {
   // Firestore path: experiments/<id>/participants/... Change it when you start a new study
-  // so pilot data and real data never mix (e.g. "smith2016-pilot-a", "smith2016-final").
-  id: "framing-demo",
+  // so pilot data and real data never mix (e.g. "schapiro2013-pilot-a", "schapiro2013-final").
+  id: "schapiro2013-pilot-a",
 
-  // Trials per Firestore write. 1 = save every trial the moment it finishes (dropouts leave
-  // partial data). The free tier allows 20,000 writes/day: with 200 participants x 100 trials
-  // you would exceed it, so raise this for long trial-based tasks (e.g. 20).
-  chunk_size: 1,
+  // Trials per Firestore write. With ~2,000 image trials per participant, chunk_size 1 would
+  // spend ~2,000 of the free tier's 20,000 writes/day on every participant. 50 gives ~45
+  // writes per participant; a dropout loses at most the last 50 trials (75 s).
+  chunk_size: 50,
 
   // Also store the complete jsPsych dataset on the participant document at the end.
-  // Costs one extra write and makes export robust; turn off if trials are very large.
+  // A full-length run is ~2,000 rows (~0.9 MB), over DataSaver's 800 KB cap, so it normally
+  // records full_data_omitted instead. Nothing is lost: export reads the trial chunks first.
+  // It is kept on so that a shortened pilot still gets the backup copy.
   save_full_data_at_end: true,
 
   // Prolific: if set, participants are redirected to Prolific when they finish.
@@ -43,11 +53,18 @@ const EXPERIMENT = {
   // Contact shown in consent and debrief.
   contact_email: "stanfordpsych251@gmail.com",
 
-  // Does this study need a physical keyboard? The demo does (the word task uses F and J).
-  // On a phone or tablet no keyboard appears, so a participant cannot answer those trials;
-  // they would time out silently and the session would still look complete. When true, such
-  // devices are turned away before consent. Set to false if your study is buttons/touch only.
+  // The rotation task and the parsing task are answered on the keyboard.
   requires_keyboard: true,
+
+  // ---- Design (Schapiro et al., 2013, Online Methods) ----
+  n_exposure: 1400,          // exposure-phase images (random walk)
+  n_parse_blocks: 40,        // parsing-phase blocks of 15 images (40 x 15 = 600)
+  stim_ms: 1500,             // each image is shown for 1.5 s with no interstimulus interval
+  p_rotated: 0.2,            // "rotated 90 degrees ... about 20% of the time"
+  break_every: 280,          // self-paced break "about every 7 min" (280 x 1.5 s = 7 min), exposure phase
+  response_keys: ["f", "j"], // which of these means "rotated" is counterbalanced across participants
+  beep_wrong_hz: 300,        // "a beep at one frequency ... when the response was incorrect"
+  beep_slow_hz: 900,         // "... and at another frequency when the response was not within the time frame"
 };
 
 // True on anything with a mouse, trackpad, or stylus, including laptops with touchscreens.
@@ -66,6 +83,39 @@ const CHUNK_SIZE = Number(URL_PARAMS.get("chunk_size")) || EXPERIMENT.chunk_size
 // Test-only: `?cc=CODE` sets a Prolific completion code during emulator runs, so the test
 // suite can check the screen a participant sees once you have set yours. Ignored in live runs.
 if (USE_EMULATOR && URL_PARAMS.get("cc")) EXPERIMENT.prolific_completion_code = URL_PARAMS.get("cc");
+// Short runs for testing and piloting: `?n_exposure=12&n_parse_blocks=2&stim_ms=600&break_every=6`.
+// Honoured only in emulator runs or on localhost, never on the live site, so a participant
+// cannot shorten the study. The values used are stored on the participant document.
+const ALLOW_OVERRIDES = USE_EMULATOR || ["localhost", "127.0.0.1"].includes(window.location.hostname);
+if (ALLOW_OVERRIDES) {
+  for (const k of ["n_exposure", "n_parse_blocks", "stim_ms", "break_every"]) {
+    if (URL_PARAMS.get(k)) EXPERIMENT[k] = Number(URL_PARAMS.get(k));
+  }
+}
+
+const STIMULI = Array.from({ length: 15 }, (_, i) => "stimuli/stim-" + String(i + 1).padStart(2, "0") + ".svg");
+
+// Beeps for the rotation task, via Web Audio (no sound files). The AudioContext has to be
+// created from a click, so it is started when the participant agrees to participate.
+let audioCtx = null;
+function startAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) { audioCtx = null; }
+}
+function beep(freq) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.2, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.21);
+}
 
 // ---------------------------------------------------------------------------
 // Boot: connect the saver first so even a crash in the first trial gets logged.
@@ -143,12 +193,49 @@ if (USE_EMULATOR && URL_PARAMS.get("cc")) EXPERIMENT.prolific_completion_code = 
     experiment_id: EXPERIMENT.id,
   });
 
-  // Random assignment to a between-subjects condition, recorded on every trial and on the
-  // participant document. (For exact counterbalancing you would need a server; random
-  // assignment is fine at course sample sizes.)
-  const condition = jsPsych.randomization.sampleWithoutReplacement(["gain", "loss"], 1)[0];
+  // -------------------------------------------------------------------------
+  // Per-participant randomization: stimulus-to-node mapping, key assignment, the fixed
+  // Hamiltonian cycle, and both sequences. All of it is stored on the participant document.
+  // -------------------------------------------------------------------------
+  const G = window.CommunityGraph;
+  const nodeStim = jsPsych.randomization.shuffle(STIMULI);           // nodeStim[node] = image file
+  const [rotatedKey, uprightKey] = jsPsych.randomization.shuffle(EXPERIMENT.response_keys);
+  const condition = "rotated-" + rotatedKey;                          // the key counterbalance
+  const cycle = G.drawHamiltonianCycle(Math.random);
+
+  const exposureNodes = G.randomWalk(EXPERIMENT.n_exposure, Math.random);
+  const nRotated = Math.round(EXPERIMENT.p_rotated * EXPERIMENT.n_exposure);
+  const rotatedFlags = jsPsych.randomization.shuffle(
+    Array.from({ length: EXPERIMENT.n_exposure }, (_, i) => i < nRotated));
+  const exposureItems = G.annotate(exposureNodes)
+    .map((a, i) => ({ ...a, seq_index: i, stim: nodeStim[a.node], rotated: rotatedFlags[i] }));
+
+  const parseRaw = G.parsingSequence(EXPERIMENT.n_parse_blocks, cycle, Math.random,
+    exposureNodes[exposureNodes.length - 1]);
+  const parseItems = G.annotate(parseRaw.map((p) => p.node))
+    .map((a, i) => ({ ...parseRaw[i], ...a, seq_index: i, stim: nodeStim[a.node] }));
+
   jsPsych.data.addProperties({ condition: condition });
-  saver.updateParticipant({ condition: condition });
+  saver.updateParticipant({
+    condition: condition,
+    rotated_key: rotatedKey,
+    upright_key: uprightKey,
+    node_stimuli: nodeStim,
+    hamiltonian_cycle: cycle,
+    settings: {
+      n_exposure: EXPERIMENT.n_exposure, n_parse_blocks: EXPERIMENT.n_parse_blocks,
+      stim_ms: EXPERIMENT.stim_ms, p_rotated: EXPERIMENT.p_rotated, break_every: EXPERIMENT.break_every,
+    },
+  });
+  // For the automated test: which key means "rotated" for this participant.
+  window.__exp = { rotated_key: rotatedKey, upright_key: uprightKey };
+
+  // Load every image before the timed phases so no trial starts with a blank image.
+  await Promise.all(STIMULI.map((src) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = img.onerror = resolve;
+    img.src = src;
+  })));
 
   // -------------------------------------------------------------------------
   // 1. Consent (course-wide IRB text; edit only the contact address)
@@ -174,24 +261,31 @@ if (USE_EMULATOR && URL_PARAMS.get("cc")) EXPERIMENT.prolific_completion_code = 
       if (!data.consented) {
         // No end message here: jsPsych would paint it over the screen that on_finish renders.
         jsPsych.abortExperiment();
+        return;
       }
+      startAudio(); // runs inside the click, which browsers require before playing sound
     },
   };
 
   // -------------------------------------------------------------------------
   // 2. Instructions
   // -------------------------------------------------------------------------
+  const totalMin = Math.round(
+    (EXPERIMENT.n_exposure + 15 * EXPERIMENT.n_parse_blocks) * EXPERIMENT.stim_ms / 60000) + 5;
   const instructions = {
     type: jsPsychInstructions,
     pages: [
       `<h2>Welcome</h2>
-       <p>This short study has three parts: a few questions about you, one decision problem,
-       and a quick word task. It takes about three minutes.</p>`,
+       <p>This study has two main parts. In both you will watch a stream of abstract images,
+       shown one at a time, and press keys in response. It takes about ${totalMin} minutes,
+       with short breaks along the way.</p>`,
       `<p>Please complete the study in one sitting, in a quiet place, on a laptop or desktop
-       computer. Use the buttons or the arrow keys to move between pages.</p>`,
+       computer with a keyboard. <strong>Please turn your sound on</strong>: the first part uses
+       beeps as feedback. Use the buttons or the arrow keys to move between pages.</p>`,
     ],
     show_clickable_nav: true,
     data: { task: "instructions" },
+    on_finish: startAudio,
   };
 
   // -------------------------------------------------------------------------
@@ -220,88 +314,128 @@ if (USE_EMULATOR && URL_PARAMS.get("cc")) EXPERIMENT.prolific_completion_code = 
   };
 
   // -------------------------------------------------------------------------
-  // 4. Framing problem (between-subjects: gain vs loss frame)
+  // 4. Exposure phase: rotation-detection cover task on a random walk
   // -------------------------------------------------------------------------
-  const framingText = {
-    gain: {
-      a: "If Program A is adopted, 200 people will be saved.",
-      b: "If Program B is adopted, there is a one-third probability that 600 people will be saved, and a two-thirds probability that no people will be saved.",
-    },
-    loss: {
-      a: "If Program A is adopted, 400 people will die.",
-      b: "If Program B is adopted, there is a one-third probability that nobody will die, and a two-thirds probability that 600 people will die.",
-    },
-  };
-  const framing = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: () => `
-      <div class="framing">
-        <p>Imagine that the country is preparing for the outbreak of an unusual disease, which is
-        expected to kill 600 people. Two alternative programs to combat the disease have been
-        proposed. Assume that the exact scientific estimates of the consequences of the programs
-        are as follows:</p>
-        <ul class="programs">
-          <li>${framingText[condition].a}</li>
-          <li>${framingText[condition].b}</li>
-        </ul>
-        <p>Which of the two programs would you favor?</p>
-      </div>`,
-    choices: ["Program A", "Program B"],
-    data: { task: "framing" },
-    on_finish: (data) => {
-      // Program A is the certain option in both frames; B is the risky gamble.
-      data.choice = data.response === 0 ? "certain" : "risky";
-    },
-  };
+  const K = (k) => `<strong>${k.toUpperCase()}</strong>`;
+  const stimHtml = (cls, seqIndex, node, rotated) =>
+    `<div class="stim-frame"><img class="stim ${cls}${rotated ? " rotated" : ""}" ` +
+    `data-seq="${seqIndex}" src="${nodeStim[node]}" alt=""></div>`;
 
-  // -------------------------------------------------------------------------
-  // 5. Lexical decision (short RT block with trial-level logging)
-  // -------------------------------------------------------------------------
-  const ldInstructions = {
+  const allImagesGrid = jsPsych.randomization.shuffle(STIMULI)
+    .map((src) => `<img class="grid-stim" src="${src}" alt="">`).join("");
+  const exposureInstructions = {
     type: jsPsychInstructions,
     pages: [
-      `<h2>Word task</h2>
-       <p>You will see a string of letters. Press <strong>F</strong> if it is a real English word
-       and <strong>J</strong> if it is not. Respond as quickly and accurately as you can.
-       Place your fingers on F and J now.</p>`,
+      `<h2>Part 1</h2>
+       <p>Here are all of the images you will see, in their normal orientation. Take a moment
+       to look at them.</p>
+       <div class="stim-grid">${allImagesGrid}</div>`,
+      `<h2>Part 1</h2>
+       <p>The images will now appear one at a time, each for ${(EXPERIMENT.stim_ms / 1000).toFixed(1)} seconds,
+       one straight after the other. Sometimes an image will be <strong>rotated</strong> away
+       from the orientation you just saw.</p>
+       <p>For <em>every</em> image, press:</p>
+       <ul>
+         <li>${K(rotatedKey)} if the image is <strong>rotated</strong></li>
+         <li>${K(uprightKey)} if it is in its <strong>normal orientation</strong></li>
+       </ul>
+       <p>Respond while the image is still on the screen. You will hear a <strong>low beep</strong>
+       if you press the wrong key, and a <strong>high beep</strong> if you do not respond in time.</p>
+       <p>There will be a short break about every 7 minutes. Place your fingers on
+       ${K(EXPERIMENT.response_keys[0])} and ${K(EXPERIMENT.response_keys[1])}, then press Next to begin.</p>`,
     ],
     show_clickable_nav: true,
     data: { task: "instructions" },
   };
-  const ldItems = [
-    { word: "TABLE", is_word: true }, { word: "GARDEN", is_word: true },
-    { word: "PLANET", is_word: true }, { word: "SILVER", is_word: true },
-    { word: "FLIRP", is_word: false }, { word: "MANTOR", is_word: false },
-    { word: "BRENDLE", is_word: false }, { word: "TOSKIN", is_word: false },
-  ];
-  const fixation = {
+
+  // Exposure trial: the plugin records the first key press; an extra listener beeps the
+  // moment a wrong key is pressed, and on_finish beeps for no response at stimulus offset.
+  const tv = (name) => jsPsych.timelineVariable(name);
+  const ev = (name) => jsPsych.evaluateTimelineVariable(name);
+  const exposureTrial = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<div class="fixation">+</div>',
-    choices: "NO_KEYS",
-    trial_duration: 500,
-    data: { task: "fixation" },
-  };
-  const ldTrial = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: () => `<div class="stimulus">${jsPsych.evaluateTimelineVariable("word")}</div>`,
-    choices: ["f", "j"],
-    trial_duration: 3000,
+    stimulus: () => stimHtml("exposure-stim", ev("seq_index"), ev("node"), ev("rotated")),
+    choices: EXPERIMENT.response_keys,
+    trial_duration: EXPERIMENT.stim_ms,
+    response_ends_trial: false,
     data: {
-      task: "lexical_decision",
-      word: jsPsych.timelineVariable("word"),
-      is_word: jsPsych.timelineVariable("is_word"),
+      task: "exposure", seq_index: tv("seq_index"), node: tv("node"), community: tv("community"),
+      stim: tv("stim"), rotated: tv("rotated"),
+      community_change: tv("community_change"), prev_run: tv("prev_run"),
+    },
+    on_load: () => {
+      const expected = ev("rotated") ? rotatedKey : uprightKey;
+      jsPsych.pluginAPI.getKeyboardResponse({
+        callback_function: (info) => {
+          if (!jsPsych.pluginAPI.compareKeys(info.key, expected)) beep(EXPERIMENT.beep_wrong_hz);
+        },
+        valid_responses: EXPERIMENT.response_keys,
+        rt_method: "performance",
+        persist: false,
+        allow_held_key: false,
+      });
     },
     on_finish: (data) => {
-      const expected = data.is_word ? "f" : "j";
-      data.correct = data.response === expected;
+      const expected = data.rotated ? rotatedKey : uprightKey;
       data.timed_out = data.response === null;
+      data.correct = !data.timed_out && jsPsych.pluginAPI.compareKeys(data.response, expected);
+      if (data.timed_out) beep(EXPERIMENT.beep_slow_hz);
+      delete data.stimulus; // the image is identified by `stim`; the HTML only bloats the data
     },
   };
-  const lexicalDecision = {
-    timeline: [fixation, ldTrial],
-    timeline_variables: ldItems,
-    randomize_order: true,
+
+  const breakScreen = (phaseName, done, total) => ({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `<h2>Break</h2>
+      <p class="thanks">You have finished ${done} of ${total} images in ${phaseName}.
+      Take a short rest if you like, then press Continue when you are ready.</p>`,
+    choices: ["Continue"],
+    data: { task: "break", phase: phaseName, after_trials: done },
+  });
+
+  // Split the walk into segments with a break between them.
+  const exposurePhase = [];
+  for (let start = 0; start < exposureItems.length; start += EXPERIMENT.break_every) {
+    const seg = exposureItems.slice(start, start + EXPERIMENT.break_every);
+    if (start > 0) exposurePhase.push(breakScreen("Part 1", start, exposureItems.length));
+    exposurePhase.push({ timeline: [exposureTrial], timeline_variables: seg });
+  }
+
+  // -------------------------------------------------------------------------
+  // 5. Parsing phase: spacebar at "natural breaking points"
+  // -------------------------------------------------------------------------
+  const parsingInstructions = {
+    type: jsPsychInstructions,
+    pages: [
+      `<h2>Part 2</h2>
+       <p>Well done, Part 1 is over. In this part you will see more sequences of the same
+       images, all in their correct orientation, again one at a time.</p>
+       <p>You no longer need to judge rotation. Instead, simply press the <strong>spacebar</strong>
+       at times in the sequence that you feel are natural breaking points.</p>
+       <p>There are no right or wrong answers. Press Next to begin.</p>`,
+    ],
+    show_clickable_nav: true,
+    data: { task: "instructions" },
   };
+
+  const parsingTrial = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: () => stimHtml("parse-stim", ev("seq_index"), ev("node"), false),
+    choices: [" "],
+    trial_duration: EXPERIMENT.stim_ms,
+    response_ends_trial: false,
+    data: {
+      task: "parsing", seq_index: tv("seq_index"), node: tv("node"), community: tv("community"),
+      stim: tv("stim"), block: tv("block"), block_pos: tv("block_pos"),
+      walk_type: tv("walk_type"), direction: tv("direction"),
+      community_change: tv("community_change"), prev_run: tv("prev_run"),
+    },
+    on_finish: (data) => {
+      data.parsed = data.response !== null;
+      delete data.stimulus;
+    },
+  };
+  const parsingPhase = { timeline: [parsingTrial], timeline_variables: parseItems };
 
   // -------------------------------------------------------------------------
   // 6. Feedback
@@ -329,9 +463,11 @@ if (USE_EMULATOR && URL_PARAMS.get("cc")) EXPERIMENT.prolific_completion_code = 
     type: jsPsychHtmlButtonResponse,
     stimulus: `
       <h2>Debrief</h2>
-      <p>Thank you. In this study we tested whether describing the same outcomes as lives saved or
-      as lives lost changes which program people choose. Different participants saw different
-      wordings. If you have questions about this research, contact
+      <p>Thank you. The order of the images in this study was not random: each image tended to be
+      followed by certain others, and the images fell into three groups that tended to appear
+      together. We are testing whether people pick up on these groups without being told about
+      them, and whether they place "breaking points" where the sequence moves from one group to
+      another. If you have questions about this research, contact
       <a href="mailto:${EXPERIMENT.contact_email}">${EXPERIMENT.contact_email}</a>.
       Press the button to save your responses and finish.</p>`,
     choices: ["Finish"],
@@ -342,9 +478,10 @@ if (USE_EMULATOR && URL_PARAMS.get("cc")) EXPERIMENT.prolific_completion_code = 
     consent,
     instructions,
     demographics,
-    framing,
-    ldInstructions,
-    lexicalDecision,
+    exposureInstructions,
+    ...exposurePhase,
+    parsingInstructions,
+    parsingPhase,
     feedback,
     comments,
     debrief,

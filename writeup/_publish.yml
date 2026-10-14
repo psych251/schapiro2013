@@ -1,0 +1,4 @@
+- source: replication-report.qmd
+  posit-connect-cloud:
+    - id: 01a103a1-eced-ec83-e6df-f4bb9326ef50
+      url: https://connect.posit.cloud/suheecho/content/01a103a1-eced-ec83-e6df-f4bb9326ef50

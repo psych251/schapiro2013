@@ -60,3 +60,6 @@ identifiers.csv
 
 # agent worktrees
 .claude/worktrees/
+
+code_edit.qmd
+writeup/optional_stopping/
