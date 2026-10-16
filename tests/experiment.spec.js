@@ -39,8 +39,12 @@ async function runThroughExperiment(page, { stopBeforeFinish = false, demographi
   if (demographics) {
     await page.locator('input[type="number"]').fill("34");
     await page.getByText("Woman", { exact: true }).click();
-    // SurveyJS boolean switches render "Yes" twice once toggled; scope to the question.
     await page.locator('[data-name="native_english"]').getByText("Yes", { exact: true }).first().click();
+  } else {
+    // Every item is required, so a participant who declines picks "Prefer not to say" on each.
+    for (const q of ["age_declined", "gender", "native_english"]) {
+      await page.locator(`[data-name="${q}"]`).getByText("Prefer not to say", { exact: true }).first().click();
+    }
   }
   await page.locator('input[value="Continue"]').click();
   // 4. exposure: two instruction pages, then the rotation task with a break every few images
@@ -197,6 +201,28 @@ test.describe("experiment", () => {
     await page.getByRole("button", { name: "I do not agree" }).click();
     await expect(page.getByText("You chose not to participate")).toBeVisible({ timeout: 15000 });
     await expect(page.getByText("Your responses were saved")).toHaveCount(0);
+  });
+
+  test("demographics names the unanswered items and blocks Continue until each is answered or declined", async ({ page }) => {
+    await page.goto(url(EMULATOR ? "emulator=1" : ""));
+    await page.waitForFunction(() => window.__saver && window.__saver.uid);
+    await page.getByRole("button", { name: "I agree to participate" }).click();
+    await page.locator("#jspsych-instructions-next").click();
+    await page.locator("#jspsych-instructions-next").click();
+    const msg = page.locator(".missing-msg");
+    await page.locator('input[value="Continue"]').click();
+    await expect(msg).toContainText("your age; your gender; whether English is your first language");
+    // The list shrinks as items are answered, and Continue still refuses while any remain.
+    await page.locator('input[type="number"]').fill("34");
+    await page.getByText("Woman", { exact: true }).click();
+    await expect(msg).toContainText("To continue, please answer: whether English is your first language.");
+    await page.locator('input[value="Continue"]').click();
+    await expect(page.locator('[data-name="native_english"]')).toBeVisible();
+    // Declining counts as an answer.
+    await page.locator('[data-name="native_english"]').getByText("Prefer not to say", { exact: true }).click();
+    await expect(msg).toHaveCount(0);
+    await page.locator('input[value="Continue"]').click();
+    await expect(page.locator("#jspsych-instructions-next")).toBeVisible();
   });
 
   test("losing the connection at the end offers the download fallback instead of hanging", async ({ page, context }) => {

@@ -62,16 +62,34 @@ experiment_id_phase2 <- "framing-demo-phase2"
 # statistics table, and the side-by-side figures. Replace these with your original study's
 # values, and say in a comment exactly where in the paper each one comes from.
 #
-# Tversky & Kahneman (1981), Problem 1 (gain frame, N = 152): 72% chose the certain program,
-# 28% the risky one. Problem 2 (loss frame, N = 155): 22% certain, 78% risky. The paper
-# reports percentages, so the counts below are reconstructed from them.
+# Schapiro et al. (2013), Experiment 2. N = 10: "experiment 2 had ten participants" (Online
+# Methods, Participants). Key test: participants "pressed the spacebar on passing into a new
+# cluster significantly more often than at other times in the sequence (t9 = 2.30, P < 0.05;
+# Fig. 2b)".
+# This is a paired t-test (transition vs. other parse probability, within participants). The
+# paper gives only the t values and "P < 0.05", not the means or SDs, so the effect size is
+# derived from t: Cohen's d_z = t / sqrt(N), with p and the 95% CI on d_z recomputed from t.
+# Fig. 2b plots the means (±1 SEM) but they are not stated in the text.
+
+# 95% CI on d_z from a paired t, by inverting the noncentral t distribution.
+dz_ci <- function(t, n, level = 0.95) {
+  df <- n - 1
+  ncp_at <- function(q) uniroot(function(ncp) pt(t, df, ncp) - q, c(-40, 40))$root
+  c(ncp_at((1 + level) / 2), ncp_at((1 - level) / 2)) / sqrt(n)
+}
 original <- tibble(
-  condition = c("gain", "loss"),
-  n         = c(152, 155),
-  risky     = round(c(0.28 * 152, 0.78 * 155))
-)
-original_p_gain <- original$risky[original$condition == "gain"] / original$n[original$condition == "gain"]
-original_p_loss <- original$risky[original$condition == "loss"] / original$n[original$condition == "loss"]
+  paths = c("All trials", "Hamiltonian paths"),
+  N     = 10,
+  t     = c(2.30, 2.35)
+) |>
+  mutate(df = N - 1,
+         p  = 2 * pt(-abs(t), df),
+         estimate = t / sqrt(N),
+         ci_low  = map2_dbl(t, N, ~ dz_ci(.x, .y)[1]),
+         ci_high = map2_dbl(t, N, ~ dz_ci(.x, .y)[2]))
+# The key test is the one on all trials.
+original_key <- original |> filter(paths == "All trials")
+original_dz  <- original_key$estimate
 ```
 
 ::: {.callout-note appearance="simple" icon="false"}
@@ -87,7 +105,8 @@ original_p_loss <- original$risky[original$condition == "loss"] / original$n[ori
 
 | Tool and model | What it was used for | How you checked the output |
 |------------------------|------------------------|------------------------|
-| Claude Code (Claude Opus 5.5)* | *Implemented the experiment code* | *Inputted the experiment summary written by myself and original Methods section and ran the model to generate the code* |
+| Claude Code (Claude Opus 5.5)\* | *Implemented the experiment code* | *Inputted the experiment summary written by myself and original Methods section and ran the model to generate the code* |
+| Claude Code (Claude Opus 5.5)\* | *Generated the visual stimuli used for the experiment* | *Described the visual stimuli used in the original experiment in natural language and inputted it to the AI model, to generate the code that creates comparable stimuli* |
 
 I wrote all of the text in this report myself. AI tools were not used to write, rewrite or paraphrase it, and were not used to generate, alter, or impute any participant data. I take full responsibility for the content of this report, including any errors introduced by AI tools.
 
@@ -188,24 +207,27 @@ have_phase2 <- !is.null(phase2)
 ```{r}
 #| label: key-stats
 #| echo: false
+# Each row needs N, df, t, p, and d_z as estimate / ci_low / ci_high (the columns of `original`).
+# The Phase rows still call the template's framing-demo functions, which find no framing trials
+# in this experiment and so show "not yet collected" until the parsing analysis replaces them.
 fmt_row <- function(study, r) {
   if (is.null(r)) {
-    return(tibble(Study = study, N = "", `Effect (loss − gain)` = "not yet collected",
-                  `95% CI` = "", `χ²(1)` = "", p = ""))
+    return(tibble(Study = study, N = "", `Effect (d_z)` = "not yet collected",
+                  `95% CI` = "", t = "", p = ""))
   }
   tibble(Study = study, N = as.character(r$N),
-         `Effect (loss − gain)` = sprintf("%.0f points", 100 * r$estimate),
-         `95% CI` = sprintf("[%.0f, %.0f]", 100 * r$ci_low, 100 * r$ci_high),
-         `χ²(1)` = sprintf("%.2f", r$statistic),
+         `Effect (d_z)` = sprintf("%.2f", r$estimate),
+         `95% CI` = sprintf("[%.2f, %.2f]", r$ci_low, r$ci_high),
+         t = sprintf("t(%d) = %.2f", r$df, r$t),
          p = format.pval(r$p, digits = 2, eps = 0.001))
 }
 bind_rows(
-  fmt_row("Original", diff_ci(original)),
+  fmt_row("Original (Exp. 2)", original_key),
   fmt_row("Phase 1: replication", if (have_data) diff_ci(risky_counts(phase1))),
   fmt_row("Phase 2: extension", if (have_phase2) diff_ci(risky_counts(phase2)))
 ) |>
-  knitr::kable(align = "lrlllr",
-               caption = "Key comparison: difference in the percentage of analysed participants choosing the risky program, loss frame minus gain frame.")
+  knitr::kable(align = "lrllll",
+               caption = "Key comparison: parse probability at community transitions vs. elsewhere in the sequence, all trials, paired t-test. Original values are from Schapiro et al. (2013), Experiment 2; its d_z, 95% CI and exact p are recomputed from the reported t9 = 2.30 (reported as P < 0.05).")
 ```
 
 # Phase 1: Replication
@@ -248,22 +270,23 @@ Original effects are usually overestimates, so powering to the original effect t
 
 ```{r}
 #| label: power
+# Paired t-test: with sd = 1, delta is d_z and n is the number of participants.
 power_rows <- map_dfr(c(0.80, 0.90, 0.95), function(pw) {
-  n <- power.prop.test(p1 = original_p_gain, p2 = original_p_loss,
-                       power = pw, sig.level = 0.05)$n
-  tibble(power = scales::percent(pw), n_per_group = ceiling(n), n_total = 2 * ceiling(n))
+  n <- power.t.test(delta = original_dz, sd = 1, power = pw, sig.level = 0.05,
+                    type = "paired")$n
+  tibble(power = scales::percent(pw), n_total = ceiling(n))
 })
 
-original_effect <- original_p_loss - original_p_gain
-two_and_half <- ceiling(2.5 * original$n)
+original_effect <- original_dz
+two_and_half <- ceiling(2.5 * original_key$N)
 
-knitr::kable(power_rows, col.names = c("Power", "N per frame", "N total"),
+knitr::kable(power_rows, col.names = c("Power", "N participants"),
              caption = sprintf(
-               "Sample needed to detect the original effect (risky choice: %.0f%% gain vs %.0f%% loss, a difference of %.0f points), two-sided alpha = .05.",
-               100 * original_p_gain, 100 * original_p_loss, 100 * original_effect))
+               "Sample needed to detect the original effect (Experiment 2, d_z = %.2f, from t9 = %.2f with N = %d), paired t-test, two-sided alpha = .05.",
+               original_dz, original_key$t, original_key$N))
 ```
 
-For comparison, 2.5 times the original sample would be `r two_and_half[1]` in the gain frame and `r two_and_half[2]` in the loss frame (`r sum(two_and_half)` in total).
+For comparison, 2.5 times the original sample (N=10) would be N=`r two_and_half` in total.
 
 ### Planned sample
 
@@ -636,43 +659,42 @@ Justify the Phase 2 sample, and **state how you expect the estimate and its prec
 
 ```{r}
 #| label: phase2-power
-phase2_n_per_group <- 150   # planned analysed participants per condition in Phase 2
+# Within-subject design: every participant contributes both parse probabilities, so this is the
+# number of analysed participants in Phase 2, not a per-condition count.
+phase2_n_per_group <- 150
 
-p1_counts <- if (have_data) risky_counts(phase1)
-p1_stats  <- if (have_data) diff_ci(p1_counts)
-basis <- if (!is.null(p1_stats)) {
-  list(gain = p1_counts$risky[p1_counts$condition == "gain"] / p1_counts$n[p1_counts$condition == "gain"],
-       loss = p1_counts$risky[p1_counts$condition == "loss"] / p1_counts$n[p1_counts$condition == "loss"],
-       source = "Phase 1")
-} else {
-  list(gain = original_p_gain, loss = original_p_loss, source = "the original study")
-}
+# Phase 1 estimate, in the same columns as `original` (N, df, t, p, estimate = d_z, ci_low, ci_high).
+# Still the template's framing-demo call, so NULL until the parsing analysis replaces it.
+p1_stats <- if (have_data) diff_ci(risky_counts(phase1))
+basis <- if (!is.null(p1_stats)) list(dz = p1_stats$estimate, source = "Phase 1") else
+  list(dz = original_dz, source = "the original study")
 
-# Expected 95% CI half-width on the difference at n per condition.
-half_width <- function(n) 1.96 * sqrt(basis$gain * (1 - basis$gain) / n + basis$loss * (1 - basis$loss) / n)
-power_at <- function(n, p1, p2) {
-  tryCatch(power.prop.test(n = n, p1 = p1, p2 = p2, sig.level = 0.05)$power, error = function(e) NA)
+# Expected 95% CI half-width on d_z at n participants (large-sample approximation).
+half_width <- function(n, dz) qt(0.975, n - 1) * sqrt(1 / n + dz^2 / (2 * n))
+power_at <- function(n, dz) {
+  tryCatch(power.t.test(n = n, delta = dz, sd = 1, sig.level = 0.05, type = "paired")$power,
+           error = function(e) NA)
 }
 
 rows <- tibble(
   Study = c(if (!is.null(p1_stats)) "Phase 1 (actual)", "Phase 2 (planned)"),
-  `N analysed` = c(if (!is.null(p1_stats)) p1_stats$N, 2 * phase2_n_per_group),
-  `95% CI half-width` = c(if (!is.null(p1_stats)) sprintf("±%.0f points", 100 * (p1_stats$ci_high - p1_stats$ci_low) / 2),
-                          sprintf("±%.0f points (expected)", 100 * half_width(phase2_n_per_group)))
+  `N analysed` = c(if (!is.null(p1_stats)) p1_stats$N, phase2_n_per_group),
+  `95% CI half-width` = c(if (!is.null(p1_stats)) sprintf("±%.2f", (p1_stats$ci_high - p1_stats$ci_low) / 2),
+                          sprintf("±%.2f (expected)", half_width(phase2_n_per_group, basis$dz)))
 )
-knitr::kable(rows, caption = sprintf("Precision of the key estimate, Phase 2 expected values based on %s.", basis$source))
+knitr::kable(rows, caption = sprintf("Precision of the key estimate (d_z), Phase 2 expected values based on %s.", basis$source))
 
 tibble(
-  `Effect to detect` = c(sprintf("Original: %.0f points", 100 * (original_p_loss - original_p_gain)),
-                         if (!is.null(p1_stats)) sprintf("Phase 1: %.0f points", 100 * p1_stats$estimate),
-                         sprintf("Half the original: %.0f points", 50 * (original_p_loss - original_p_gain))),
+  `Effect to detect` = c(sprintf("Original: d_z = %.2f", original_dz),
+                         if (!is.null(p1_stats)) sprintf("Phase 1: d_z = %.2f", p1_stats$estimate),
+                         sprintf("Half the original: d_z = %.2f", original_dz / 2)),
   `Power at planned N` = scales::percent(c(
-    power_at(phase2_n_per_group, original_p_gain, original_p_loss),
-    if (!is.null(p1_stats)) power_at(phase2_n_per_group, basis$gain, basis$loss),
-    power_at(phase2_n_per_group, original_p_gain, original_p_gain + (original_p_loss - original_p_gain) / 2)
+    power_at(phase2_n_per_group, original_dz),
+    if (!is.null(p1_stats)) power_at(phase2_n_per_group, p1_stats$estimate),
+    power_at(phase2_n_per_group, original_dz / 2)
   ), accuracy = 1)
 ) |>
-  knitr::kable(caption = sprintf("Power of the Phase 2 key test at %d per condition, two-sided alpha = .05.", phase2_n_per_group))
+  knitr::kable(caption = sprintf("Power of the Phase 2 key test (paired t) at %d participants, two-sided alpha = .05.", phase2_n_per_group))
 ```
 
 ## Analysis plan

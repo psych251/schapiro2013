@@ -16,3 +16,4 @@
 .stim.rotated { transform: rotate(90deg); }
 .stim-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 1em 0; }
 .grid-stim { width: 100%; height: auto; display: block; }
+.missing-msg { color: #b00020; font-weight: 600; }

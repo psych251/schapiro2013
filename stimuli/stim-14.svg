@@ -1,18 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="-150 -150 300 300">
 <defs>
-    <radialGradient id="bg" cx="0.2608762492076494" cy="0.16148668763926252" r="1">
-      <stop offset="0" stop-color="hsla(344.3889233181253,60%,85%,1)"/>
-      <stop offset="1" stop-color="hsla(71.48715765587986,55%,30%,1)"/>
-    </radialGradient></defs>
-<rect width="300" height="300" fill="url(#bg)"/>
-<path d="M 159.8 165.5 Q 159.7 187.9 155.4 202.5 Q 151.1 217.2 131.6 221.6 Q 112.2 226.0 103.5 207.0 Q 94.8 187.9 102.9 167.9 Q 111.1 147.8 135.5 145.5 Q 160.0 143.2 159.8 165.5 Z" fill="hsla(48.521296185441315,72.94616708299145%,33.39411711785942%,0.6898655302473344)"/>
-<path d="M 210.7 203.8 Q 211.9 245.3 202.2 272.2 Q 192.5 299.2 152.3 315.0 Q 112.0 330.9 102.4 288.1 Q 92.7 245.3 110.3 216.3 Q 127.9 187.2 168.7 174.7 Q 209.4 162.2 210.7 203.8 Z" fill="hsla(29.991449498571455,85.9123985725455%,57.6854417915456%,0.754637956514489)"/>
-<path d="M 265.7 49.4 Q 287.6 71.9 266.2 95.8 Q 244.8 119.8 210.1 115.4 Q 175.4 111.0 178.4 74.1 Q 181.5 37.1 212.7 32.0 Q 243.8 26.9 265.7 49.4 Z" fill="hsla(64.91885163728148,74.07482614275068%,57.192591577768326%,0.5937887756503187)"/>
-<circle cx="73.4" cy="201.0" r="56.7" fill="none" stroke="hsla(147.0781023511663,70%,66.54701012186706%,0.85)" stroke-width="5.9"/>
-<circle cx="73.4" cy="201.0" r="42.0" fill="none" stroke="hsla(170.34673429932445,70%,32.74786657653749%,0.85)" stroke-width="2.0"/>
-<circle cx="73.4" cy="201.0" r="28.9" fill="none" stroke="hsla(139.82902715355158,70%,27.937033982016146%,0.85)" stroke-width="3.0"/>
-<circle cx="73.4" cy="201.0" r="12.4" fill="none" stroke="hsla(170.49119427707046,70%,71.0379898082465%,0.85)" stroke-width="4.0"/>
-<path d="M 89.5 153.7 C 190.9 43.1, 214.0 299.0, 223.4 52.3" fill="none" stroke="hsla(316.884328125976,80%,69.2181141267065%,0.9)" stroke-width="11.1" stroke-linecap="round"/>
-<path d="M 113.3 191.1 C 115.1 97.2, 120.2 202.7, 283.1 102.6" fill="none" stroke="hsla(331.0907666934654,80%,72.1942507813219%,0.9)" stroke-width="5.2" stroke-linecap="round"/>
-<ellipse cx="77.2" cy="97.2" rx="19.4" ry="8.8" fill="hsla(164.3889233181253,90%,92%,0.95)"/>
+  <radialGradient id="bg14" cx="0" cy="0" r="148" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="hsla(0,0%,20.5%,1.00)"/>
+    <stop offset="1" stop-color="hsla(0,0%,89.6%,1.00)"/>
+  </radialGradient>
+  <clipPath id="disc14"><circle r="148"/></clipPath>
+  <g id="m14">
+<ellipse cx="108.5" cy="38.6" rx="31.8" ry="14.1" transform="rotate(8.5 108.5 38.6)" fill="hsla(0,0%,40.4%,0.55)"/>
+<ellipse cx="18.0" cy="42.0" rx="31.8" ry="13.3" transform="rotate(86.3 18.0 42.0)" fill="hsla(0,0%,76.7%,0.78)"/>
+<path d="M 26.2 29.0 C 57.6 79.7, 44.5 85.0, 41.6 105.7" fill="none" stroke="hsla(0,0%,17.0%,0.90)" stroke-width="5.7" stroke-linecap="round"/>
+<path d="M 20.9 18.0 C 27.0 91.2, -54.4 106.1, -119.4 69.4" fill="none" stroke="hsla(0,0%,82.2%,0.90)" stroke-width="7.8" stroke-linecap="round"/>
+<circle cx="61.4" cy="65.2" r="9.7" fill="hsla(0,0%,89.8%,0.95)"/>
+  </g>
+</defs>
+<g clip-path="url(#disc14)">
+<circle r="148" fill="url(#bg14)"/>
+<use href="#m14" transform="rotate(0.0)"/>
+<use href="#m14" transform="rotate(120.0)"/>
+<use href="#m14" transform="rotate(240.0)"/>
+<circle r="97.2" fill="none" stroke="hsla(0,0%,82.5%,0.80)" stroke-width="2.0"/>
+<circle r="103.7" fill="none" stroke="hsla(0,0%,95.4%,0.80)" stroke-width="2.2"/>
+</g>
+<circle r="148" fill="none" stroke="hsla(0,0%,30.0%,1.00)" stroke-width="1.5"/>
 </svg>

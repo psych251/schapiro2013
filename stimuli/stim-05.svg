@@ -1,18 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="-150 -150 300 300">
 <defs>
-    <radialGradient id="bg" cx="0.3448585324571468" cy="0.22355226279469206" r="1">
-      <stop offset="0" stop-color="hsla(126.8996760668233,60%,85%,1)"/>
-      <stop offset="1" stop-color="hsla(207.7442458178848,55%,30%,1)"/>
-    </radialGradient></defs>
-<rect width="300" height="300" fill="url(#bg)"/>
-<path d="M 253.9 164.2 Q 269.2 185.1 256.9 208.9 Q 244.6 232.8 220.7 246.6 Q 196.9 260.5 183.7 235.9 Q 170.6 211.4 149.3 198.2 Q 128.1 185.1 139.1 161.7 Q 150.1 138.3 173.5 128.9 Q 196.9 119.5 217.8 131.4 Q 238.7 143.2 253.9 164.2 Z" fill="hsla(235.97686974797398,62.64978736639023%,61.72820940846577%,0.7754101880826056)"/>
-<path d="M 109.1 74.6 Q 131.8 96.5 108.9 117.9 Q 86.1 139.3 48.0 140.5 Q 9.9 141.8 16.3 101.1 Q 22.6 60.5 54.5 56.6 Q 86.4 52.7 109.1 74.6 Z" fill="hsla(161.75897306296974,40.89408759959042%,53.98479501018301%,0.6031417719437742)"/>
-<path d="M 182.7 124.4 Q 195.8 136.3 182.1 147.6 Q 168.5 158.9 157.2 166.8 Q 145.9 174.7 130.3 171.1 Q 114.7 167.5 109.0 151.9 Q 103.3 136.3 114.5 126.1 Q 125.6 116.0 135.7 106.0 Q 145.9 95.9 157.8 104.2 Q 169.7 112.5 182.7 124.4 Z" fill="hsla(176.48968045134097,54.194293052423745%,37.720964394975454%,0.8855587836937048)"/>
-<circle cx="213.1" cy="144.6" r="52.9" fill="none" stroke="hsla(293.99931555613875,70%,20.694410391151905%,0.85)" stroke-width="4.4"/>
-<circle cx="213.1" cy="144.6" r="26.9" fill="none" stroke="hsla(320.02105561550707,70%,23.978977221995592%,0.85)" stroke-width="3.5"/>
-<circle cx="213.1" cy="144.6" r="16.6" fill="none" stroke="hsla(285.928088882938,70%,73.97160531952977%,0.85)" stroke-width="3.4"/>
-<circle cx="213.1" cy="144.6" r="12.9" fill="none" stroke="hsla(305.9212259016931,70%,51.94005107041448%,0.85)" stroke-width="4.2"/>
-<path d="M 101.3 262.6 C 177.8 257.7, 138.2 218.8, 271.6 4.8" fill="none" stroke="hsla(137.43198088835925,80%,55.32926238141954%,0.9)" stroke-width="8.2" stroke-linecap="round"/>
-<path d="M 93.8 234.4 C 130.1 282.3, 65.7 122.4, 213.9 134.1" fill="none" stroke="hsla(116.08614512253553,80%,16.570931647438556%,0.9)" stroke-width="13.1" stroke-linecap="round"/>
-<ellipse cx="69.1" cy="23.8" rx="15.9" ry="8.5" fill="hsla(306.8996760668233,90%,92%,0.95)"/>
+  <radialGradient id="bg5" cx="0" cy="0" r="148" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="hsla(0,0%,94.2%,1.00)"/>
+    <stop offset="1" stop-color="hsla(0,0%,22.1%,1.00)"/>
+  </radialGradient>
+  <clipPath id="disc5"><circle r="148"/></clipPath>
+  <g id="m5">
+<ellipse cx="98.8" cy="34.8" rx="44.4" ry="19.4" transform="rotate(25.1 98.8 34.8)" fill="hsla(0,0%,80.6%,0.86)"/>
+<ellipse cx="-38.3" cy="88.9" rx="18.8" ry="9.0" transform="rotate(130.1 -38.3 88.9)" fill="hsla(0,0%,72.6%,0.75)"/>
+<path d="M 15.0 20.9 C 8.3 45.9, -37.4 86.2, -103.8 90.8" fill="none" stroke="hsla(0,0%,11.9%,0.90)" stroke-width="4.7" stroke-linecap="round"/>
+<path d="M -5.4 10.4 C -52.5 58.6, -70.8 39.4, -133.2 35.3" fill="none" stroke="hsla(0,0%,9.6%,0.90)" stroke-width="6.3" stroke-linecap="round"/>
+<path d="M 35.0 18.2 C 10.1 61.2, -101.4 54.9, -134.2 -61.8" fill="none" stroke="hsla(0,0%,85.0%,0.90)" stroke-width="8.6" stroke-linecap="round"/>
+<path d="M 7.1 8.8 C 15.9 52.9, -31.1 134.0, -85.6 120.5" fill="none" stroke="hsla(0,0%,13.3%,0.90)" stroke-width="8.5" stroke-linecap="round"/>
+<circle cx="9.9" cy="29.6" r="4.1" fill="hsla(0,0%,86.0%,0.95)"/>
+  </g>
+</defs>
+<g clip-path="url(#disc5)">
+<circle r="148" fill="url(#bg5)"/>
+<use href="#m5" transform="rotate(0.0)"/>
+<use href="#m5" transform="rotate(120.0)"/>
+<use href="#m5" transform="rotate(240.0)"/>
+<circle r="14.5" fill="none" stroke="hsla(0,0%,18.0%,0.80)" stroke-width="2.7"/>
+</g>
+<circle r="148" fill="none" stroke="hsla(0,0%,30.0%,1.00)" stroke-width="1.5"/>
 </svg>

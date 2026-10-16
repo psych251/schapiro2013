@@ -51,7 +51,7 @@ const EXPERIMENT = {
   prolific_completion_code: "",
 
   // Contact shown in consent and debrief.
-  contact_email: "stanfordpsych251@gmail.com",
+  contact_email: "suheecho@stanford.edu",
 
   // The rotation task and the parsing task are answered on the keyboard.
   requires_keyboard: true,
@@ -276,7 +276,7 @@ function beep(freq) {
     type: jsPsychInstructions,
     pages: [
       `<h2>Welcome</h2>
-       <p>This study has two main parts. In both you will watch a stream of abstract images,
+       <p>Welcome to the study! This study has two main parts. In both you will watch a stream of abstract images,
        shown one at a time, and press keys in response. It takes about ${totalMin} minutes,
        with short breaks along the way.</p>`,
       `<p>Please complete the study in one sitting, in a quiet place, on a laptop or desktop
@@ -296,19 +296,59 @@ function beep(freq) {
     survey_json: {
       showQuestionNumbers: "off",
       completeText: "Continue",
+      // Commit the age as it is typed, so its error clears (and the page reflows) then, not
+      // when the participant clicks the next question.
+      textUpdateMode: "onTyping",
       pages: [
         {
           elements: [
-            // The consent text promises participants may decline any question, so nothing here is required.
-            { type: "text", name: "age", title: "How old are you?", inputType: "number", min: 18, max: 120 },
+            // Every item must be answered, but the consent text promises participants may decline
+            // any question, so each one offers "Prefer not to say". Ticking it for age clears the age.
             {
-              type: "radiogroup", name: "gender", title: "What is your gender?",
+              type: "text", name: "age", title: "How old are you?", inputType: "number", min: 18, max: 120,
+              requiredIf: "{age_declined} empty", enableIf: "{age_declined} empty",
+            },
+            {
+              type: "checkbox", name: "age_declined", titleLocation: "hidden",
+              choices: [{ value: "declined", text: "Prefer not to say" }],
+            },
+            {
+              type: "radiogroup", name: "gender", title: "What is your gender?", isRequired: true,
               choices: ["Woman", "Man", "Non-binary"], showOtherItem: true, showNoneItem: true, noneText: "Prefer not to say",
             },
-            { type: "boolean", name: "native_english", title: "Is English your first language?", labelTrue: "Yes", labelFalse: "No" },
+            {
+              type: "radiogroup", name: "native_english", title: "Is English your first language?", isRequired: true,
+              choices: [{ value: true, text: "Yes" }, { value: false, text: "No" }], showNoneItem: true, noneText: "Prefer not to say",
+            },
+            { type: "html", name: "missing_msg", visible: false },
           ],
         },
       ],
+    },
+    // On Continue with items left blank, list them under the questions (each one is also flagged
+    // inline). The list then updates as they are answered and disappears once nothing is missing.
+    survey_function: (survey) => {
+      const labels = { age: "your age", gender: "your gender", native_english: "whether English is your first language" };
+      const missing = () => {
+        const d = survey.data;
+        const out = [];
+        if ((d.age === undefined || d.age === "") && !(d.age_declined || []).length) out.push(labels.age);
+        if (d.gender === undefined || (d.gender === "other" && !d["gender-Comment"])) out.push(labels.gender);
+        if (d.native_english === undefined) out.push(labels.native_english);
+        return out;
+      };
+      const show = () => {
+        const msg = survey.getQuestionByName("missing_msg");
+        const items = missing();
+        msg.html = `<p class="missing-msg">To continue, please answer: ${items.join("; ")}. ` +
+          `If you would rather not answer a question, choose "Prefer not to say".</p>`;
+        msg.visible = items.length > 0;
+      };
+      survey.onValidatedErrorsOnCurrentPage.add(show);
+      survey.onValueChanged.add((s, opts) => {
+        if (opts.name === "age_declined" && (opts.value || []).length) s.clearValue("age");
+        if (s.getQuestionByName("missing_msg").visible) show();
+      });
     },
     data: { task: "demographics" },
   };
@@ -463,13 +503,13 @@ function beep(freq) {
     type: jsPsychHtmlButtonResponse,
     stimulus: `
       <h2>Debrief</h2>
-      <p>Thank you. The order of the images in this study was not random: each image tended to be
-      followed by certain others, and the images fell into three groups that tended to appear
-      together. We are testing whether people pick up on these groups without being told about
-      them, and whether they place "breaking points" where the sequence moves from one group to
+      <p>You are all done, thank you! In fact, the order of the images in this study was not random.
+      The images fell into three groups that tended to appear together, meaning that certain images were more likely to be followed by others.
+      We are testing whether people pick up on this probabilistic structure of the groups without being told about
+      them by observing whether they place "breaking points" where the sequence moves from one group to
       another. If you have questions about this research, contact
       <a href="mailto:${EXPERIMENT.contact_email}">${EXPERIMENT.contact_email}</a>.
-      Press the button to save your responses and finish.</p>`,
+      Press the button to save your responses and finish. Thank you again. </p>`,
     choices: ["Finish"],
     data: { task: "debrief" },
   };
