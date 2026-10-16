@@ -112,12 +112,6 @@ I wrote all of the text in this report myself. AI tools were not used to write, 
 
 # Key statistics
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-One row per study for the key comparison: the original, your Phase 1 replication, and your Phase 2 extension. The table fills itself in from the data as each phase is exported, using the analysis code below (open "Show the analysis code"), which is shared by both phases so they are analysed identically. Edit that code once, here, to match your design and preregistered exclusion rule. On the scientific-extension track, the Phase 2 row reports the new comparison: adapt its code and say so in the caption.
-:::
-
 ```{r}
 #| label: analysis-functions
 #| code-summary: "Show the analysis code (shared by Phase 1 and Phase 2)"
@@ -260,14 +254,6 @@ A hypothesis I can test without running an additional experiment is: can visual 
 
 ### Power analysis
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Report the original effect size, the sample needed for 80%, 90% and 95% power to detect it, and the sample you chose and why. The table below is computed from the original study's numbers entered at the top of this file.
-
-Original effects are usually overestimates, so powering to the original effect tends to produce an underpowered replication. One widely used alternative is to collect 2.5 times the original sample, which gives 80% power to detect an effect the original study had only 33% power to detect (Simonsohn, 2015; Experimentology §10.4). Say which approach you used, and what the course's participant budget allowed.
-:::
-
 ```{r}
 #| label: power
 # Paired t-test: with sd = 1, delta is d_z and n is the number of participants.
@@ -286,45 +272,37 @@ knitr::kable(power_rows, col.names = c("Power", "N participants"),
                original_dz, original_key$t, original_key$N))
 ```
 
-For comparison, 2.5 times the original sample (N=10) would be N=`r two_and_half` in total.
+For comparison, 2.5 times the original sample (N=10) would be N=`r two_and_half`. I decided to use the sample size that provides 80% power (N=`r original_key$N`), since it requires fewer participants than the 2.5 times original sample size, and I have a limited budget for recruiting participants.
 
 ### Planned sample
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Planned sample size and stopping rule, sampling frame (for example, "US residents on Prolific, fluent in English, 18 or older"), known demographics, and any preselection or screening. The stopping rule should be data-independent: "collect until N participants pass the exclusion criteria below" rather than "until the result is clear".
-:::
-
+The experiment will be implemented online, and participants will be recruited on Prolific from US residents who are fluent in English and 18 or older. I plan to recruit `r original_key$N` valid samples that pass the exclusion criteria. I will exclude participants who did not complete the study, who scored less than 50% in the exposure phase which reflects task compliance, and who took more than one hour and a half. The reason for the last exclusion criterion is that the study, without any breaks, takes slightly more than 50 minutes in total. Participants can take breaks between phases (e.g., when they switch from the exposure phase to the parsing phase), but if they take breaks that are too long, their memory for the stimuli may decay, and the results may not be reflecting the effect that I aim to observe.
+  
 ### Materials
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-All materials. You can quote the original article directly: put the text in quotation marks and note that it was followed precisely, or quote it and point out the exceptions. Link to the live experiment above rather than pasting screenshots of every screen.
-:::
+The experiment requires 15 distinct visual stimuli with circular boundaries that are radial. These stimuli should not look identical when rotated by 90°. The authors of the original study did not provide the stimuli they used; they indicated the software they used to generate the stimuli (ArtMatic Pro), but I did not have access to the software. Therefore, I created my own stimuli following the described criteria. The code to generate the stimuli is included in the repository at `/scripts/make-stimuli.js`, and the generated stimuli are included in `/stimuli`.
 
 ### Procedure
 
-::: {.callout-tip icon="false"}
-## Guidance
+#### Welcome and demographics
+Once participants access the website, they must agree to the consent form presented on the first page. After a welcoming message, they are instructed to turn on audio, as they will receive audio feedback during the experiment. Then, they are prompted to provide demographics including age, gender, and first language.
 
-As for Materials: quote the original where you can and point out the exceptions. Describe the sequence a participant experiences, from consent to debrief, and how long it takes.
-:::
+#### Exposure phase (35 minutes + 4 short breaks)
+The exposure phase begins with participants viewing 50 abstract images with circular boundaries. The instructions specify that these images are in their normal orientation, but in the following experiment, participants will be asked whether each image is rotated from its normal orientation. Participants can take as much time as needed to familiarize themselves with the images. On the next page, more detailed instructions—including the keys to press to indicate rotation—are provided. The instructions also clarify that participants will receive audio feedback for incorrect responses or failure to respond during stimulus presentation.
+
+Then, the test phase begins. Participants view a sequence of 1,400 images, one at a time, for 1.5 seconds each. They press key J if they think the image is rotated and key F if they think it is in its original orientation. A low-frequency beep plays for incorrect responses and a higher-frequency beep for missed responses during the 1.5-second stimulus presentation window. Every 7 minutes, participants can choose to take a short break.
+
+#### Parsing phase (15 minute)
+After the test phase, instructions for the parsing phase are provided. Participants are told they will view a sequence of images similar to the test phase and press the spacebar when they think there should be a breaking point. When ready, the parsing phase begins (15 minutes). A sequence of 600 images, all in their normal orientation, is shown one at a time for 1.5 seconds each. Participants can decide whether to place a breakpoint anytime during sequence presentation.
+
+#### Feedback and debriefing
+Once participants complete the parsing phase, a brief feedback page appears. Participants are asked to provide optional responses about whether the instructions were clear and any comments about the study. Finally, a debriefing page explaining the study’s goal, what we aim to measure, and contact information (suheecho@stanford.edu) is shown.
 
 ### Analysis plan
 
-::: {.callout-tip icon="false"}
-## Guidance
+**Key analysis of interest.** For both random walk-generated part of the sequence and Hamiltonian path-generated part of the sequence, the proportion of break points placed at community transitions is higher than the proportion of break points placed somewhere else, tested with a two-tailed paired-samples t-test. The effect size is Cohen's d_z computed as (p_{community transition} - p_{other}), with a 95% confidence interval.
 
-The analysis strategy, as close to the original as possible: data cleaning rules, exclusion rules, covariates, and the model or test. Original papers often do not spell this out; say where you had to make a choice and what you chose.
-
-**State the key analysis of interest explicitly.** That is the single test your replication stands or falls on, and it must match your preregistration. You can pre-specify additional analyses here too.
-:::
-
-**Key analysis of interest.** The proportion of participants choosing the risky program is higher in the loss frame than in the gain frame, tested with a chi-square test of independence on the 2 × 2 table of frame by choice. The effect size is the difference in the proportion choosing the risky program (loss minus gain), with a 95% confidence interval.
-
-**Exclusions.** Participants are excluded if they did not complete the study, if they answered no speeded trial at all (every lexical-decision trial timed out, the signature of a device without a keyboard), or if they answered fewer than 6 of the 8 lexical-decision trials correctly.
+**Exclusions.** Participants are excluded if they did not complete the study, scored less than 50% in the exposure phase, or they took more than one hour and half to complete the entire study.
 
 ### Differences from the original study
 

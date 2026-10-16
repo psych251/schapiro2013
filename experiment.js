@@ -367,7 +367,8 @@ function beep(freq) {
     type: jsPsychInstructions,
     pages: [
       `<h2>Part 1</h2>
-       <p>Here are all of the images you will see, in their normal orientation. Take a moment
+       <p>Here are all of the images you will see, in their normal orientation. During the experiment, you will be asked 
+       to identify whether the presented images are rotated from the original orientation. Feel free to take a moment
        to look at them.</p>
        <div class="stim-grid">${allImagesGrid}</div>`,
       `<h2>Part 1</h2>
@@ -448,10 +449,10 @@ function beep(freq) {
     type: jsPsychInstructions,
     pages: [
       `<h2>Part 2</h2>
-       <p>Well done, Part 1 is over. In this part you will see more sequences of the same
-       images, all in their correct orientation, again one at a time.</p>
-       <p>You no longer need to judge rotation. Instead, simply press the <strong>spacebar</strong>
-       at times in the sequence that you feel are natural breaking points.</p>
+       <p>Well done! Part 1 is over. In the next part, you will see more sequences of the same
+       images, all in their original orientation, again one at a time.</p>
+       <p>In part 2, you no longer need to judge rotation. Instead, simply press the <strong>spacebar</strong>
+       at times in the sequence that you feel would be natural to place <strong>breaking points</strong>.</p>
        <p>There are no right or wrong answers. Press Next to begin.</p>`,
     ],
     show_clickable_nav: true,
