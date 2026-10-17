@@ -272,11 +272,11 @@ knitr::kable(power_rows, col.names = c("Power", "N participants"),
                original_dz, original_key$t, original_key$N))
 ```
 
-For comparison, 2.5 times the original sample (N=10) would be N=`r two_and_half`. I decided to use the sample size that provides 80% power (N=`r original_key$N`), since it requires fewer participants than the 2.5 times original sample size, and I have a limited budget for recruiting participants.
+For comparison, 2.5 times the original sample (N=10) would be N=`r two_and_half`. I decided to use the sample size that provides 80% power (N=17), since it requires fewer participants than the 2.5 times original sample size, and I have a limited budget for recruiting participants.
 
 ### Planned sample
 
-The experiment will be implemented online, and participants will be recruited on Prolific from US residents who are fluent in English and 18 or older. I plan to recruit `r original_key$N` valid samples that pass the exclusion criteria. I will exclude participants who did not complete the study, who scored less than 50% in the exposure phase which reflects task compliance, and who took more than one hour and a half. The reason for the last exclusion criterion is that the study, without any breaks, takes slightly more than 50 minutes in total. Participants can take breaks between phases (e.g., when they switch from the exposure phase to the parsing phase), but if they take breaks that are too long, their memory for the stimuli may decay, and the results may not be reflecting the effect that I aim to observe.
+The experiment will be implemented online, and participants will be recruited on Prolific from US residents who are fluent in English and 18 or older. I plan to recruit 17 valid samples that pass the exclusion criteria. I will exclude participants who did not complete the study, who scored less than 50% or responded less than 70% in the exposure phase which reflects task compliance, and who took more than one hour and a half. The reason for the last exclusion criterion is that the study, without any breaks, takes slightly more than 50 minutes in total. Participants can take breaks between phases (e.g., when they switch from the exposure phase to the parsing phase), but if they take breaks that are too long, their memory for the stimuli may decay, and the results may not be reflecting the effect that I aim to observe.
   
 ### Materials
 
@@ -302,24 +302,18 @@ Once participants complete the parsing phase, a brief feedback page appears. Par
 
 **Key analysis of interest.** For both random walk-generated part of the sequence and Hamiltonian path-generated part of the sequence, the proportion of break points placed at community transitions is higher than the proportion of break points placed somewhere else, tested with a two-tailed paired-samples t-test. The effect size is Cohen's d_z computed as (p_{community transition} - p_{other}), with a 95% confidence interval.
 
-**Exclusions.** Participants are excluded if they did not complete the study, scored less than 50% in the exposure phase, or they took more than one hour and half to complete the entire study.
+**Exclusions.** Participants are excluded if they did not complete the study, scored less than 50% in the exposure phase, responded to less than 70% of the stimuli in the exposure phase,or they took more than one hour and half to complete the entire study.
 
 ### Differences from the original study
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Every known difference in sample, setting, procedure, materials, and analysis, one per row. Minimizing differences is the goal, but some always remain. For each one, say whether it is expected to matter, based on claims in the original article or later research on when the effect does and does not appear. The rows below are the demo's real differences and show the level of detail expected; replace them with yours.
-:::
-
 | Aspect | Original study | This replication | Expected to matter? |
 |------------------|------------------|------------------|------------------|
-| Sample | University students in Stanford and British Columbia classrooms | Adults recruited on Prolific | Possibly. Framing effects have been found in both student and general samples, but their size varies across populations. |
-| Setting | Paper questionnaire in class | Online, unsupervised, on the participant's own computer | Unlikely for a single vignette, though attention may be lower online. |
-| Wording | "an unusual Asian disease" | "an unusual disease" | Unlikely. The ethnonym is incidental to the manipulation and dated. |
-| Design | Between subjects: each participant saw one frame | Between subjects, randomly assigned | No. |
-| Response | Circle a program on paper | Click a button | Unlikely. |
-| Other tasks | Problems presented alongside other questionnaire items | Followed by a short lexical-decision task used as an attention check | Unlikely: the check comes after the choice. |
+| Sample | Members of the Princeton community paid $12/h or given course credit. | Adults recruited on Prolific. | Not likely. |
+| Setting | Offline in the lab. | Online, unsupervised, on the participant's own computer. | Possibly, since the study is about an hour long. The participants' attention may be lower online. |
+| Procedure | The participants took a short break every 7 minutes during the exposure phase. | I followed the original study's procedure, but did not control the break duration. | Likely. I assume that the breaks in the original study were shorter and within the lab. That said, it is hard to control the participants' breaks when they are participating online. If the breaks are too long and if the participants engage in other activities during the breaks, it might affect their performance. |
+| Materials | 15 ArtMatic Pro-generated abstract fractal images (Fig. 1c of the original paper). | Generated grayscale circular images with radial symmetry. | Not likely. |
+| Response | During the exposure phase, the participants were asked to press two different keys to respond, and the keys were not specified in the paper. | I used keys F and J. | Not likely. |
+| Analyses | The paper does not report any exclusion rule. | I introduced some exclusion criteria described in the section above, mainly in order to ensure data quality because I am recruiting participants and running the experiment online. | Not likely. |
 
 ### Methods addendum (post data collection)
 

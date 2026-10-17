@@ -429,7 +429,8 @@ function beep(freq) {
     type: jsPsychHtmlButtonResponse,
     stimulus: `<h2>Break</h2>
       <p class="thanks">You have finished ${done} of ${total} images in ${phaseName}.
-      Take a short rest if you like, then press Continue when you are ready.</p>`,
+      Take a short break if you like. As a reminder, as you continue the session, press ${K(rotatedKey)} if the image is rotated and ${K(uprightKey)} if it is in its normal orientation. 
+      Press Continue when you are ready.</p>`,
     choices: ["Continue"],
     data: { task: "break", phase: phaseName, after_trials: done },
   });
