@@ -321,13 +321,13 @@ script is you. It is the one real secret in this whole setup.
    (for the untouched demo that is `framing-demo`):
 
    ```bash
-   npm run export -- --experiment smith2016-final --key ~/keys/smith2016-abc123.json
+   npm run export -- --experiment schapiro2013-pilot-a --key ../keys/schapiro2013-replication-af8d9-firebase-adminsdk-fbsvc-cf32dcb1a6.json
    ```
 
    If it reports finding nothing, the `--experiment` value almost certainly does not match
    your `EXPERIMENT.id`.
 
-   This writes into `data/raw/smith2016-final/`:
+   This writes into `data/raw/schapiro2013-pilot-a/`:
 
    | File | What it holds |
    | --- | --- |
