@@ -367,8 +367,8 @@ function beep(freq) {
     type: jsPsychInstructions,
     pages: [
       `<h2>Part 1</h2>
-       <p>Here are all of the images you will see, in their normal orientation. During the experiment, you will be asked 
-       to identify whether the presented images are rotated from the original orientation. Feel free to take a moment
+       <p>Here are all of the images you will see, in their normal orientation. During the experiment, <strong>you will be asked 
+       to identify whether the presented images are rotated from the original orientation.</strong> Please take a moment
        to look at them.</p>
        <div class="stim-grid">${allImagesGrid}</div>`,
       `<h2>Part 1</h2>
@@ -382,6 +382,7 @@ function beep(freq) {
        </ul>
        <p>Respond while the image is still on the screen. You will hear a <strong>low beep</strong>
        if you press the wrong key, and a <strong>high beep</strong> if you do not respond in time.</p>
+       <p>Again, you need to press a key for <strong>every</strong> image.</p>
        <p>There will be a short break about every 7 minutes. Place your fingers on
        ${K(EXPERIMENT.response_keys[0])} and ${K(EXPERIMENT.response_keys[1])}, then press Next to begin.</p>`,
     ],
