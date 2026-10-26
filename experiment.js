@@ -33,7 +33,7 @@ window.TEMPLATE_VERSION = "0.1.0";
 const EXPERIMENT = {
   // Firestore path: experiments/<id>/participants/... Change it when you start a new study
   // so pilot data and real data never mix (e.g. "schapiro2013-pilot-a", "schapiro2013-final").
-  id: "schapiro2013-pilot-a",
+  id: "schapiro2013-pilot-b",
 
   // Trials per Firestore write. With ~2,000 image trials per participant, chunk_size 1 would
   // spend ~2,000 of the free tier's 20,000 writes/day on every participant. 50 gives ~45
