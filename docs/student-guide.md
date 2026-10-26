@@ -321,7 +321,7 @@ script is you. It is the one real secret in this whole setup.
    (for the untouched demo that is `framing-demo`):
 
    ```bash
-   npm run export -- --experiment schapiro2013-pilot-a --key ../keys/schapiro2013-replication-af8d9-firebase-adminsdk-fbsvc-cf32dcb1a6.json
+   npm run export -- --experiment schapiro2013-pilot-b --key ../keys/schapiro2013-replication-af8d9-firebase-adminsdk-fbsvc-cf32dcb1a6.json
    ```
 
    If it reports finding nothing, the `--experiment` value almost certainly does not match
