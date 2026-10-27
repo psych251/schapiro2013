@@ -90,6 +90,21 @@ original <- tibble(
 # The key test is the one on all trials.
 original_key <- original |> filter(paths == "All trials")
 original_dz  <- original_key$estimate
+
+# Fig. 2b (Experiment 2) bar heights and error bars, for the side-by-side figure. The paper
+# does not state these in the text; they were read from the vector drawing of Fig. 2b in the
+# publisher's PDF (page 487), where the y axis runs from 0 at 125.18 pt to 0.4 at 225.03 pt.
+# Error bars are ±1 SEM, N = 10 (Fig. 2 legend); sem is half the distance between the caps.
+# Check: with these values, the reported t9 = 2.30 and 2.35 imply a correlation of .48 and .58
+# between the two parse types across participants.
+original_fig2b <- tibble(
+  paths = rep(c("All trials", "Hamiltonian paths"), each = 2),
+  type  = rep(c("Community transition parse", "Other parse"), times = 2),
+  mean  = c(0.320, 0.167, 0.298, 0.161),
+  sem   = c(0.069, 0.062, 0.066, 0.062),
+  n     = 10
+) |>
+  mutate(type = factor(type, levels = c("Community transition parse", "Other parse")))
 ```
 
 ::: {.callout-note appearance="simple" icon="false"}
@@ -105,8 +120,10 @@ original_dz  <- original_key$estimate
 
 | Tool and model | What it was used for | How you checked the output |
 |------------------------|------------------------|------------------------|
-| Claude Code (Claude Opus 5.5)\* | *Implemented the experiment code* | *Inputted the experiment summary written by myself and original Methods section and ran the model to generate the code* |
-| Claude Code (Claude Opus 5.5)\* | *Generated the visual stimuli used for the experiment* | *Described the visual stimuli used in the original experiment in natural language and inputted it to the AI model, to generate the code that creates comparable stimuli* |
+| Claude Code (Claude Opus 5.5) | Implemented the experiment code | Inputted the experiment summary that I wrote and the original Methods section and ran the model to generate the code |
+| Claude Code (Claude Opus 5.5) | Generated the visual stimuli used for the experiment | Reviewed the generated stimuli to ensure that they meet the criteria necessary to replicate the original study |
+| Claude Code (Claude Opus 5.5) | Read the original experiment results from the bar plot in the original paper and plotted them | Reviewed the generated plot to ensure it matches the original plot from the paper |
+| Claude Code (Claude Opus 5.5) | Generated code that plots side-by-side comparisons of the original and replicated results | Reviewed the generated plot to ensure it plots what I intended |
 
 I wrote all of the text in this report myself. AI tools were not used to write, rewrite or paraphrase it, and were not used to generate, alter, or impute any participant data. I take full responsibility for the content of this report, including any errors introduced by AI tools.
 
@@ -196,25 +213,38 @@ key_test <- function(d) {
   if (nrow(r) == 0) NULL else r
 }
 
-# Bar plot analogous to Fig. 2b: mean parse probability by type, all trials and Hamiltonian
-# paths, error bars ±1 SEM across participants, * where the paired t-test gives p < .05.
-parse_plot <- function(probs) {
-  means <- probs |>
+# Mean parse probability by type, ±1 SEM across participants, in the columns of
+# `original_fig2b`.
+parse_means <- function(probs) {
+  probs |>
     group_by(paths, type) |>
     summarise(mean = mean(p), sem = sd(p) / sqrt(n()), n = n(), .groups = "drop")
-  tests <- parse_test(probs) |>
-    left_join(means |> group_by(paths) |> summarise(top = max(mean + coalesce(sem, 0))), by = "paths") |>
+}
+
+# Bar plot analogous to Fig. 2b, one panel per study on a shared y axis, in the order given.
+# Each study is list(means = <parse_means() columns>, tests = <paths and p>); * where the
+# paired t-test gives p < .05.
+parse_plot <- function(...) {
+  studies <- list(...)
+  means <- imap_dfr(studies, ~ mutate(.x$means, Study = .y))
+  tests <- imap_dfr(studies, ~ mutate(select(.x$tests, paths, p), Study = .y)) |>
+    left_join(means |> group_by(Study, paths) |> summarise(top = max(mean + coalesce(sem, 0)), .groups = "drop"),
+              by = c("Study", "paths")) |>
     mutate(label = if_else(p < 0.05, "*", "n.s."))
+  means <- mutate(means, Study = factor(Study, levels = names(studies)))
+  tests <- mutate(tests, Study = factor(Study, levels = names(studies)))
   dodge <- position_dodge(width = 0.8)
   ggplot(means, aes(x = paths, y = mean, fill = type)) +
     geom_col(position = dodge, width = 0.75, colour = "black") +
     geom_errorbar(aes(ymin = mean - sem, ymax = mean + sem), position = dodge, width = 0.2) +
     geom_text(data = tests, aes(x = paths, y = top + 0.02, label = label), inherit.aes = FALSE, size = 5) +
+    facet_wrap(~ Study) +
     scale_fill_manual(values = c("Community transition parse" = "grey25", "Other parse" = "grey85")) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
     labs(x = NULL, y = "Probability of parse", fill = NULL) +
     theme_classic(base_size = 12) +
-    theme(legend.position = "top")
+    theme(legend.position = "top", strip.background = element_blank(),
+          strip.text = element_text(face = "bold"))
 }
 
 # The key comparison's raw counts: how many analysed participants chose the risky program
@@ -596,11 +626,14 @@ Whichever you choose, use the same measure, scale, condition order and error-bar
 ```{r}
 #| label: fig-comparison
 #| eval: !expr have_data
-#| fig-cap: "Phase 1 replication of Schapiro et al. (2013), Fig. 2b: proportion of opportunities on which analysed participants parsed at a community transition (arrival in a new community after at least four steps in another) and at non-transition images, for all parsing trials and for Hamiltonian paths only. Error bars are ±1 SEM across participants; * p < .05, paired t-test. The original reports these means only graphically (Fig. 2b, N = 10; t9 = 2.30 for all trials and t9 = 2.35 for Hamiltonian paths)."
-#| fig-width: 7
+#| fig-cap: "Proportion of opportunities on which analysed participants parsed at a community transition (arrival in a new community after at least four steps in another) and at non-transition images, for all parsing trials and for Hamiltonian paths only. Left: results from the original experiment in Schapiro et al. (2013, Exp. 2, Fig. 2b, N = 10; t9 = 2.30 for all trials and t9 = 2.35 for Hamiltonian paths), replotted based on the values read from the original figure. Right: replication data. Error bars are ±1 SEM across participants; * p < .05, n.s. = not significant, paired t-test."
+#| fig-width: 9
 #| fig-height: 4
 probs <- parse_probs(phase1)
-if (nrow(probs) > 0) parse_plot(probs) else message("No analysed participants yet, so there is nothing to plot.")
+if (nrow(probs) > 0) {
+  parse_plot(`Original (Schapiro et al., 2013, Exp. 2)` = list(means = original_fig2b, tests = original),
+             `Replication` = list(means = parse_means(probs), tests = parse_test(probs)))
+} else message("No analysed participants yet, so there is nothing to plot.")
 ```
 
 ### Exploratory analyses
