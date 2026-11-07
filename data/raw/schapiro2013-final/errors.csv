@@ -1,0 +1,9 @@
+error_id,uid,at,message,trial_index,stack,context,url,user_agent,client_time
+KxB7RUIKAuwrZc2qvrF3,A2y0DxNKZTRyJ5REEvRRqhGVmBv2,2026-10-31T21:57:22.837Z,Cannot read properties of undefined (reading 'toLowerCase'),1,"TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+    at it.toLowerCaseIfInsensitive (https://psych251.github.io/schapiro2013/lib/jspsych.js:5:5288)
+    at it.getPhysicalKey (https://psych251.github.io/schapiro2013/lib/jspsych.js:5:5340)
+    at it.rootKeydownListener (https://psych251.github.io/schapiro2013/lib/jspsych.js:5:5026)","{""kind"":""uncaught"",""source"":""https://psych251.github.io/schapiro2013/lib/jspsych.js"",""line"":5,""col"":5288}",https://psych251.github.io/schapiro2013/,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",2026-10-31T21:57:22.697Z
+nlVADyfVeO4qQr5p0luH,A2y0DxNKZTRyJ5REEvRRqhGVmBv2,2026-10-31T21:57:22.875Z,Cannot read properties of undefined (reading 'toLowerCase'),1,"TypeError: Cannot read properties of undefined (reading 'toLowerCase')
+    at it.toLowerCaseIfInsensitive (https://psych251.github.io/schapiro2013/lib/jspsych.js:5:5288)
+    at it.getPhysicalKey (https://psych251.github.io/schapiro2013/lib/jspsych.js:5:5340)
+    at it.rootKeyupListener (https://psych251.github.io/schapiro2013/lib/jspsych.js:5:5406)","{""kind"":""uncaught"",""source"":""https://psych251.github.io/schapiro2013/lib/jspsych.js"",""line"":5,""col"":5288}",https://psych251.github.io/schapiro2013/,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",2026-10-31T21:57:22.712Z

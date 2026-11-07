@@ -51,8 +51,8 @@ library(jsonlite)
 
 # Must match EXPERIMENT.id in experiment.js, and the --experiment you passed to the export.
 # Phase 2 runs under its own id, so its data never mix with Phase 1's.
-experiment_id        <- "schapiro2013-pilot-b"
-experiment_id_phase2 <- "framing-demo-phase2"
+experiment_id        <- "schapiro2013-final"
+experiment_id_phase2 <- "schapiro2013-phase2"
 ```
 
 ```{r}
@@ -111,7 +111,7 @@ original_fig2b <- tibble(
 ## Project links
 
 - **Original paper:** Schapiro, A. C., Rogers, T. T., Cordova, N. I., Turk-Browne, N. B., & Botvinick, M. M. (2013). Neural representations of events arise from temporal community structure. *Nature neuroscience, 16*(4), 486-492. <https://doi.org/10.1038/nn.3331>
-- **Preregistration:** [OSF registration](https://osf.io/XXXXX) *(registered YYYY-MM-DD, before final data collection)*
+- **Preregistration:** [OSF registration]<https://osf.io/ukwjs> *(registered 2026-10-21, before final data collection)*
 - **Live experiment:** <https://psych251.github.io/schapiro2013/> (take the study exactly as participants did)
 - **Repository:** <https://github.com/psych251/schapiro2013> (experiment code, data, and this report)
 :::
@@ -120,10 +120,12 @@ original_fig2b <- tibble(
 
 | Tool and model | What it was used for | How you checked the output |
 |------------------------|------------------------|------------------------|
-| Claude Code (Claude Opus 5.5) | Implemented the experiment code | Inputted the experiment summary that I wrote and the original Methods section and ran the model to generate the code |
+| Claude Code (Claude Opus 5.5) | Implemented the experiment code | Ran the generated experiment paradigm several rounds by myself to ensure that it matched with what the original paper described |
 | Claude Code (Claude Opus 5.5) | Generated the visual stimuli used for the experiment | Reviewed the generated stimuli to ensure that they meet the criteria necessary to replicate the original study |
 | Claude Code (Claude Opus 5.5) | Read the original experiment results from the bar plot in the original paper and plotted them | Reviewed the generated plot to ensure it matches the original plot from the paper |
 | Claude Code (Claude Opus 5.5) | Generated code that plots side-by-side comparisons of the original and replicated results | Reviewed the generated plot to ensure it plots what I intended |
+| Claude Code (Claude Opus 5.5) | Generated code that tests my hypothesis on the Phase 1 data --- *can pixel similarities between visual stimuli explain the participants' parsing behavior?* | Prompted the AI agent to explain what it generated, and reviewed the response, as well as the actual generated code and the plot |
+| Claude (Claude Haiku 4.5) | Checked the grammar of the writings | After writing the draft of the text by myself, provided the text to the agent and prompted it to point out the sentences with grammatical errors; after reading the response, selectively accomodated changes that I agreed on |
 
 I wrote all of the text in this report myself. AI tools were not used to write, rewrite or paraphrase it, and were not used to generate, alter, or impute any participant data. I take full responsibility for the content of this report, including any errors introduced by AI tools.
 
@@ -247,51 +249,11 @@ parse_plot <- function(...) {
           strip.text = element_text(face = "bold"))
 }
 
-# The key comparison's raw counts: how many analysed participants chose the risky program
-# in each frame.
-risky_counts <- function(d) {
-  d$trials |>
-    filter(task == "framing", participant_id %in% d$keep$participant_id) |>
-    group_by(condition) |>
-    summarise(risky = sum(choice == "risky"), n = n(), .groups = "drop")
-}
-
-# The key statistic: difference in the proportion choosing the risky program (loss minus
-# gain) with a 95% CI, and the uncorrected chi-square, which is the same test. NULL until
-# both frames have at least one analysed participant.
-diff_ci <- function(counts) {
-  loss <- counts[counts$condition == "loss", ]
-  gain <- counts[counts$condition == "gain", ]
-  if (nrow(loss) == 0 || nrow(gain) == 0) return(NULL)
-  pt <- prop.test(c(loss$risky, gain$risky), c(loss$n, gain$n), correct = FALSE)
-  tibble(N = loss$n + gain$n,
-         estimate = unname(pt$estimate[1] - pt$estimate[2]),
-         ci_low = pt$conf.int[1], ci_high = pt$conf.int[2],
-         statistic = unname(pt$statistic), p = pt$p.value)
-}
 
 # Side-by-side figure: any number of studies on the same axes, in the order given.
 prop_ci <- function(x, n) {
   ci <- prop.test(x, n, correct = FALSE)$conf.int
   tibble(p = x / n, low = ci[1], high = ci[2])
-}
-comparison_plot <- function(...) {
-  studies <- list(...)
-  studies <- studies[!map_lgl(studies, ~ is.null(.x) || nrow(.x) == 0)]
-  df <- imap_dfr(studies, ~ mutate(.x, Study = .y)) |>
-    rowwise() |> mutate(prop_ci(risky, n)) |> ungroup() |>
-    mutate(Study = factor(Study, levels = names(studies)), label = sprintf("n = %d", n))
-  fills <- setNames(c("grey55", "#1E6E76", "#B8792A")[seq_along(studies)], names(studies))
-  dodge <- position_dodge(width = 0.8)
-  ggplot(df, aes(x = condition, y = p, fill = Study)) +
-    geom_col(position = dodge, width = 0.75) +
-    geom_errorbar(aes(ymin = low, ymax = high), position = dodge, width = 0.2) +
-    geom_text(aes(y = 0.02, label = label), position = dodge, vjust = 0, size = 3, colour = "white") +
-    scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
-    scale_fill_manual(values = fills) +
-    labs(x = "Frame", y = "Chose the risky program", fill = NULL) +
-    theme_minimal(base_size = 12) +
-    theme(legend.position = "top")
 }
 
 phase1 <- read_phase(experiment_id)
@@ -412,18 +374,11 @@ Once participants complete the parsing phase, a brief feedback page appears. Par
 | Sample | Members of the Princeton community paid $12/h or given course credit. | Adults recruited on Prolific. | Not likely. |
 | Setting | Offline in the lab. | Online, unsupervised, on the participant's own computer. | Possibly, since the study is about an hour long. The participants' attention may be lower online. |
 | Procedure | The participants took a short break every 7 minutes during the exposure phase. | I followed the original study's procedure, but did not control the break duration. | Likely. I assume that the breaks in the original study were shorter and within the lab. That said, it is hard to control the participants' breaks when they are participating online. If the breaks are too long and if the participants engage in other activities during the breaks, it might affect their performance. |
-| Materials | 15 ArtMatic Pro-generated abstract fractal images (Fig. 1c of the original paper). | Generated grayscale circular images with radial symmetry. | Not likely. |
+| Materials | 15 ArtMatic Pro-generated abstract images (Fig. 1c of the original paper). | Generated grayscale circular images with radial symmetry. | Not likely. |
 | Response | During the exposure phase, the participants were asked to press two different keys to respond, and the keys were not specified in the paper. | I used keys F and J. | Not likely. |
 | Analyses | The paper does not report any exclusion rule. | I introduced some exclusion criteria described in the section above, mainly in order to ensure data quality because I am recruiting participants and running the experiment online. | Not likely. |
 
 ### Methods addendum (post data collection)
-
-::: {.callout-tip icon="false"}
-## Guidance
-
-Leave this section out of the version you preregister. After data collection, report the actual sample and any deviation from the plan above.
-:::
-
 #### Actual sample
 
 ```{r}
@@ -511,21 +466,13 @@ if (nrow(demo) > 0) {
 
 #### Deviations from the preregistered plan
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Any deviation from the preregistered plan above, or "None". Changes made after seeing data belong here even if they seem minor, together with the reason.
-:::
+None.
 
 ## Results
 
 ### Data preparation
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Data preparation follows the analysis plan. Loading and exclusions are done by the shared analysis code under Key statistics (open "Show the analysis code"). Describe anything you did to the data beyond that.
-:::
+Except for the exclusions described in the Methods section, no additional data preparation was done.
 
 ### Confirmatory analysis
 
@@ -558,11 +505,6 @@ if (nrow(tests) > 0) {
 
 ### Replication assessment
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Judge the replication on effect sizes, not only on whether the key test is significant. Compare the replication estimate and its interval with the original: does the interval exclude zero, and does it include the original estimate? A significant result much smaller than the original, or a non-significant result whose interval still includes the original effect, are both informative and should be reported as such (Experimentology §3.2).
-:::
 
 ```{r}
 #| label: comparison
@@ -599,29 +541,6 @@ if (!is.null(rep)) {
 }
 ```
 
-::: {.callout-tip icon="false"}
-## Guidance: show the original next to your replication
-
-**Every report should have a figure that puts the original finding and your replication side by side.** It is the single most informative thing in a replication report: a reader can see at a glance whether the effect came back, and how its size compares. Make it however you can, in roughly this order of preference:
-
-1.  **Replot both from numbers.** Enter the original's summary statistics (means or proportions, with SDs, SEs or CIs, and Ns) in the original-study chunk at the top of this file, and plot them on the same axes as yours. That is what the demo figure below does.
-
-2.  **Replot the original from its data**, if the authors shared it or it is in an open repository, using exactly the same plotting code as for your own data.
-
-3.  **Show the original figure as an image** next to yours if neither is possible. Save a screenshot of it, for example as `writeup/images/original-figure.png`, and lay the two out in columns:
-
-    ```` markdown
-    ::: {layout-ncol=2}
-    ![Original: Tversky & Kahneman (1981), Figure 1](images/original-figure.png)
-
-    ```{{r}}
-    # your replication plot here
-    ```
-    :::
-    ````
-
-Whichever you choose, use the same measure, scale, condition order and error-bar meaning for both panels, label which is which, and cite the source of the original values or figure in the caption. If the original reported no variability, say so rather than leaving it out silently.
-:::
 
 ```{r}
 #| label: fig-comparison
@@ -638,30 +557,90 @@ if (nrow(probs) > 0) {
 
 ### Exploratory analyses
 
-::: {.callout-tip icon="false"}
-## Guidance
+I hypothesize that the similarities between the images may account for the parsing effect. To test this, I computed the cosine similarity between pixel values of consecutive images and saw whether the participants tended to place fewer boundaries between highly similar images than the ones with less similarity. This analysis is exploratory and was not planned in the preregistration.
 
-Any follow-up analyses (optional). Label them clearly as exploratory: they were not planned, so they generate hypotheses rather than test them.
-:::
+To explore this, I computed the cosine similarity between pixel values of every consecutive pair in the sequence during the parsing phase. I then compared the mean similarity of the transitions that participants parsed with the mean similarity of the transitions that they did not parse.
+
+As a result, I found that the mean similarity of the 'parsing' transitions was not significantly different from the mean similarity of the 'non-parsing' transitions (t(10) = −0.22, p = 0.83). This suggests that visual similarity of the images does not account for the parsing effect.
+
 
 ```{r}
-#| label: exploratory-rt
-#| eval: false
-# Template demo (lexical-decision task), which this experiment does not have; turned off so
-# the report renders with data. Replace with your own exploratory analysis or delete.
-ld <- trials |>
-  filter(task == "lexical_decision", participant_id %in% keep$participant_id) |>
-  mutate(correct = as.logical(correct), is_word = as.logical(is_word), rt = as.numeric(rt)) |>
-  filter(correct, !is.na(rt))
+#| label: exploratory-similarity
+#| eval: !expr have_data && requireNamespace("rsvg", quietly = TRUE)
+# Exploratory: does visual similarity between consecutive images predict parsing?
+# Cosine similarity between the pixel values of every pair of the 15 images. Each SVG is
+# rasterised at its own size (300 x 300) and composited onto white, the page background
+# (outside the circle the images are transparent). The images are grayscale, so one channel
+# holds the intensity.
+stim_files <- sprintf("stimuli/stim-%02d.svg", 1:15)
+pixels <- sapply(stim_files, function(f) {
+  img <- rsvg::rsvg(file.path("..", f))
+  as.vector(img[, , 1] * img[, , 4] + (1 - img[, , 4]))
+})
+cosine <- crossprod(pixels) / tcrossprod(sqrt(colSums(pixels^2)))
 
-if (nrow(ld) > 0) {
-  ld |>
-    group_by(`Real word` = is_word) |>
-    summarise(`Mean RT (ms)` = round(mean(rt)), `SD (ms)` = round(sd(rt)), Trials = n(), .groups = "drop") |>
-    knitr::kable(caption = "Exploratory: lexical-decision response times, correct trials only.")
+similarity_pairs <- as_tibble(cosine, rownames = "stim_a") |>
+  pivot_longer(-stim_a, names_to = "stim_b", values_to = "similarity") |>
+  filter(stim_a < stim_b)
+similarity_pairs |>
+  summarise(Pairs = n(), Mean = mean(similarity), SD = sd(similarity),
+            Min = min(similarity), Max = max(similarity)) |>
+  knitr::kable(digits = 3, caption = "Exploratory: cosine similarity of pixel values across all 105 pairs of images.")
+
+# Every image switch in the parsing phase: the transition from the previous image to the
+# current one, with the spacebar press recorded on the current image (as in parse_probs()).
+# Consecutive repeats of the same image are not switches and are left out.
+switches <- phase1$trials |>
+  filter(task == "parsing", participant_id %in% keep$participant_id) |>
+  arrange(participant_id, trial_index) |>
+  group_by(participant_id) |>
+  mutate(prev_stim = lag(stim), parsed = as.logical(parsed)) |>
+  ungroup() |>
+  filter(!is.na(prev_stim), prev_stim != stim) |>
+  mutate(similarity = cosine[cbind(prev_stim, stim)])
+
+# Per participant: mean similarity of the transitions they parsed and of those they did not.
+# Participants who never parsed have no parsed mean and drop out of the paired comparison.
+sim_by_parse <- switches |>
+  mutate(type = factor(if_else(parsed, "Parsed", "Not parsed"), levels = c("Parsed", "Not parsed"))) |>
+  group_by(participant_id, type) |>
+  summarise(similarity = mean(similarity), n_switches = n(), .groups = "drop")
+sim_wide <- sim_by_parse |>
+  select(participant_id, type, similarity) |>
+  pivot_wider(names_from = type, values_from = similarity) |>
+  drop_na()
+
+if (nrow(sim_wide) >= 2) {
+  sim_tt <- t.test(sim_wide$Parsed, sim_wide$`Not parsed`, paired = TRUE)
+  cat(sprintf(
+    "Exploratory paired t-test (N = %d participants who parsed at least once): mean similarity at parsed switches %.4f vs. %.4f at switches not parsed, t(%d) = %.2f, p = %.3f.\n",
+    nrow(sim_wide), mean(sim_wide$Parsed), mean(sim_wide$`Not parsed`),
+    as.integer(sim_tt$parameter), sim_tt$statistic, sim_tt$p.value))
 } else {
-  message("No correct lexical-decision trials with a response time yet.")
+  message("Fewer than two analysed participants parsed at least once, so there is no comparison yet.")
 }
+```
+
+```{r}
+#| label: fig-exploratory-similarity
+#| eval: !expr have_data && requireNamespace("rsvg", quietly = TRUE)
+#| fig-cap: "Exploratory: mean cosine similarity (pixel values) between consecutive images at image switches participants parsed and did not parse in the parsing phase, among analysed participants who parsed at least once. The y axis spans the range of similarity across all 105 image pairs, not zero. Error bars are ±1 SEM across participants."
+#| fig-width: 4
+#| fig-height: 4
+if (nrow(sim_wide) >= 2) {
+  sim_wide |>
+    pivot_longer(-participant_id, names_to = "type", values_to = "similarity") |>
+    mutate(type = factor(type, levels = c("Parsed", "Not parsed"))) |>
+    group_by(type) |>
+    summarise(mean = mean(similarity), sem = sd(similarity) / sqrt(n()), .groups = "drop") |>
+    ggplot(aes(x = type, y = mean, fill = type)) +
+    geom_col(width = 0.6, colour = "black") +
+    geom_errorbar(aes(ymin = mean - sem, ymax = mean + sem), width = 0.2) +
+    scale_fill_manual(values = c("Parsed" = "grey25", "Not parsed" = "grey85"), guide = "none") +
+    coord_cartesian(ylim = range(similarity_pairs$similarity)) +
+    labs(x = NULL, y = "Mean cosine similarity of transition") +
+    theme_classic(base_size = 12)
+} else message("No comparison to plot yet.")
 ```
 
 ```{r}
@@ -679,74 +658,54 @@ if (nrow(errors) > 0) {
 
 ### Summary of replication attempt
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Open with one paragraph summarizing the result of the key analysis and your assessment of whether the original finding replicated, partially replicated, or failed to replicate. Base that judgment on the replication assessment above: the size of the effect relative to the original, not just the p value.
-:::
+I attempted to replicate Schapiro et al. (2013), Experiment 2. This experiment found that, after participants are exposed to a sequence of unrelated images ordered based on a graph with multiple communities, the participants parsed a sequence of images at community transitions more often than at other points in the sequence. The original study compared the parsing probability at the community transitions versus other points in the sequence and reported a significant effect with d_z = 0.73. After I collected the data following the original study's procedure, the results of this analysis showed that the effect size was smaller than the original study's estimate (d_z = 0.05 for all trials and d_z = -0.04 for Hamiltonian paths), and the 95% confidence interval included zero ([-0.54, 0.64] for all trials and [-0.63, 0.56] for Hamiltonian paths), indicating that the effect was not statistically significant in my sample. Therefore, I conclude that my replication attempt failed to reproduce the original finding.
 
 ### Commentary
 
-::: {.callout-tip icon="false"}
-## Guidance
+I additionally ran the exploratory analysis to test whether visual similarity of the images can account for the parsing effect. The results showed that the mean similarity between two consecutive images that participants parsed was not significantly different from the mean similarity of the images that they did not parse, suggesting that visual similarity of the images does not account for the parsing effect.
 
-Open-ended commentary, none of it long: (a) what the exploratory analyses suggest; (b) what the replication means, for example whether the differences between your study and the original are definitely, plausibly, or unlikely to be moderators of the result; and (c) any objections or challenges raised by you or the original authors.
-:::
+Overall, the analyses suggest that neither the community transition nor the visual similarity of the images can account for the participants' parsing tendency. The failure to replicate the original finding may be due to differences in the sample, setting, procedure, materials, response keys, or analyses.
+
+One notable point I discovered is that there were six people who scored 15–23% during the exposure phase. This means that, on normal (upright) images, they pressed the "rotated" key about 90% of the time. They were answering consistently, just with the keys swapped.
+
+Another challenge is attention drift throughout the long experiment (minimum 50 minutes). After watching a long sequence of fractal images, participants may have become fatigued and inattentive, which may have affected their performance in the parsing phase. This is particularly true for the online setting, where participants may be more easily distracted than in a lab setting.
+
 
 # Phase 2: Extension
 
-::: {.callout-tip icon="false"}
-## Guidance: choosing your extension
-
-Follow the Extension guidelines page on Canvas. In brief:
-
-- **By default the extension is a best-practices modification of your Phase 1 experiment.** If your replication did not succeed, it is a **rescue**: address the plausible reasons for the failure. If it did succeed, it is an **upgrade**: make the estimate more precise. Typical changes are better or more reliable measurement, more trials, a within-participant design where that is legitimate, comprehension and manipulation checks, clearer instructions, or a larger or better-targeted sample.
-- **If your scientific extension pitch was approved at Milestone 3 and your replication succeeded, propose that instead:** the original conditions rerun unchanged, plus the one added condition or manipulation, with a power analysis for the new comparison.
-- On either track you may add exploratory measures **at the end** of the study.
-- Every change is listed and tagged by category below; everything else stays identical.
-
-State your track on the line below, and delete the others.
-:::
-
-**Track:** Best-practices upgrade / Best-practices rescue / Scientific extension (approved at Milestone 3)
+**Track:** Best-practices rescue
 
 ## Rationale
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-One or two paragraphs. For a rescue: what are the plausible reasons Phase 1 did not reproduce the original result, and how does each change address one of them? For an upgrade: where is the Phase 1 estimate least precise or least trustworthy, and how will the changes improve it? For a scientific extension: what question does the added condition answer, and why does it follow from the original finding?
-:::
+For the rescue strategy, I want to point out two possible reasons that might have contributed to the failure to replicate the original result. First, the instructions I gave to the participants may have been confusing, which may have led to some participants pressing the wrong key for the rotated and normal images. To address this, I plan to revise the instructions and add practice trials. Second, participants may have become fatigued or inattentive during the long experiment, which may have affected their performance. To prevent this, I plan to design the task more like a game, with levels, scores, streaks, and feedback to keep the participants engaged.
 
 ## Changes from Phase 1
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Every change from the Phase 1 experiment, one per row, each tagged with a category: Measurement, Trials, Design, Checks, Instructions, Sample, Added condition (scientific track only), or Exploratory measure (end of study only). If it is not in this table, it does not change: same materials, wording, procedure, exclusion rule and analysis. The rows below are examples for the demo; replace them with yours.
-:::
 
 | \# | Category | Phase 1 | Phase 2 | Why |
 |---------------|---------------|---------------|---------------|---------------|
-| 1 | Sample | 27 analysed participants | 300 analysed participants (150 per frame) | Phase 1's interval was too wide to distinguish the original effect from a much smaller one. |
-| 2 | Checks | No comprehension check | After the choice, participants say how many people are at risk (600) | Confirms participants read the scenario; failures are reported, and excluded only if preregistered. |
-| 3 | Exploratory measure | None | At the end: "How confident are you in your choice?" (1–7) | Exploratory only; collected after every confirmatory measure. |
+| 1 | Instructions | The instruction about the keys (F and J) to press for the original and rotated images, which are randomly assigned to individual participants, was always ordered rotation first and original next. This can be confusing for participants with the rotation--J and original--F scenario, because it opposes the actual locations of the keys on the keyboard (J is on the right, F is on the left). | The revised instruction will always mention F first and then J with their role (rotated or original). | The original instruction is confusing, as strongly suggested by the Phase 1 data. |
+| 2 | Checks | No practice trial for the exposure phase | After the instructions, participants go through short practice trials of 4 distinct images (original-rotated-original-rotated), followed by immediate feedback. | It helps the participants understand the instructions and practice. |
+| 3 | Instructions | There are no reminder instructions during the actual phases. | The reminder instructions that describe the task are placed right below the images, both for the exposure and the parsing phases. | It helps the participants remember the task. |
+| 4 | Design | The participants only got sound feedback during the exposure phase, informing whether their guess (original vs. rotated) was correct. | When the participants get the original/rotated images correct, a thumbs-up emoji (👍🏼) will pop up. An X emoji (❌) will pop up when wrong. Similarly, when the participants parse the sequence during the parsing phase, I will show a scissors emoji (✂️). | It helps the participants get engaged in the experiment and focus better. |
+| 5 | Design (Optional) | During the exposure phase, the participants don't get feedback about their performance throughout the session, and whether they are getting better over time. | The exposure phase, which consists of 5 consecutive blocks with breaks in between, is now designed like a game with levels. Each block is a level, and the participants are shown "Level N of 5" with a progress bar. The screen shows score and streaks for the rotation task on each level. Also, at each break, the participants get feedback on their performance. Starting from the second round, when the participants' score for that round beats the previous round's score, this is shown with text effect and sound. Likewise, if the participants beat their best score throughout all rounds, the participants get a special effect with sound. | It motivates the participants to focus and perform better on the task. |
 
-Everything not listed above is identical to Phase 1.
+The last item on the table is optional. Everything not listed above is identical to Phase 1.
 
 ## Power and sample
 
-::: {.callout-tip icon="false"}
-## Guidance
+The original study reported an effect size of d_z = 0.73. However, as the Phase 1 replication attempt showed a much smaller effect size of d_z = 0.05, I suspect that the true effect size is smaller than 0.73. Here, I assume that the true effect size is d_z = 0.5, which is considered medium in the field of psychology. Phase 1's 95% CI, [−0.54, 0.64], includes 0.5, which further justifies this assumption.
 
-Justify the Phase 2 sample, and **state how you expect the estimate and its precision to compare with Phase 1**. For an upgrade, plan the sample around the confidence interval you want; for a rescue, around the power to detect the original effect, or the smallest effect you would still consider a successful replication; for a scientific extension, around the power to detect the new comparison. Set `phase2_n_per_group` in the code below; the table uses Phase 1's estimate if you have it and the original's otherwise.
-:::
+With the assumed true effect size, to ensure 80% power, I need to analyze 34 participants for Phase 2. I expect that the estimate of d_z in Phase 2 will be larger than that of Phase 1, d_z = 0.05. I also expect that the 95% confidence interval will be narrower than that of Phase 1, and will not include zero.
 
 ```{r}
 #| label: phase2-power
 # Within-subject design: every participant contributes both parse probabilities, so this is the
 # number of analysed participants in Phase 2, not a per-condition count.
-phase2_n_per_group <- 150
+# 80% power to detect d_z = 0.5 (paired t, two-sided alpha = .05):
+# ceiling(power.t.test(delta = 0.5, sd = 1, power = 0.80, type = "paired")$n) = 34.
+phase2_target_dz   <- 0.5
+phase2_n_per_group <- 34
 
 # Phase 1 estimate, in the same columns as `original` (N, df, t, p, estimate = d_z, ci_low, ci_high).
 p1_stats <- if (have_data) key_test(phase1)
@@ -769,10 +728,12 @@ rows <- tibble(
 knitr::kable(rows, caption = sprintf("Precision of the key estimate (d_z), Phase 2 expected values based on %s.", basis$source))
 
 tibble(
-  `Effect to detect` = c(sprintf("Original: d_z = %.2f", original_dz),
+  `Effect to detect` = c(sprintf("Phase 2 target: d_z = %.2f", phase2_target_dz),
+                         sprintf("Original: d_z = %.2f", original_dz),
                          if (!is.null(p1_stats)) sprintf("Phase 1: d_z = %.2f", p1_stats$estimate),
                          sprintf("Half the original: d_z = %.2f", original_dz / 2)),
   `Power at planned N` = scales::percent(c(
+    power_at(phase2_n_per_group, phase2_target_dz),
     power_at(phase2_n_per_group, original_dz),
     if (!is.null(p1_stats)) power_at(phase2_n_per_group, p1_stats$estimate),
     power_at(phase2_n_per_group, original_dz / 2)
@@ -783,13 +744,10 @@ tibble(
 
 ## Analysis plan
 
-::: {.callout-tip icon="false"}
-## Guidance
+Because I am pursuing the best-practices rescue track, the confirmatory analysis for Phase 2 is the same key test as Phase 1, run on the Phase 2 data alone: a two-tailed paired t-test of parse probability at community transitions vs. other images, on all parsing trials. The exclusion rule is unchanged from Phase 1: participants are excluded if they did not complete the study, scored less than 50% in the exposure phase, responded to less than 70% of the stimuli in the exposure phase, or took more than an hour and a half to complete the entire study. I will count Phase 2 as a success if the measured effect size d_z is larger than the one reported in Phase 1 (d_z = 0.05), and the 95% confidence interval is narrower than that of Phase 1 and does not include zero. 
 
-The confirmatory analysis for Phase 2, written before Phase 2 data collection. On the best-practices tracks this is normally the same key test as Phase 1, run on the Phase 2 data alone; say whether you will also report a pooled estimate across phases, and label it exploratory if so. On the scientific track, specify the test for the new comparison. Name the exclusion rule (unchanged unless it is in the Changes table) and list any exploratory measures.
+I don't plan any exploratory measures. Because I am planning to revise the paradigm from Phase 1 (see 'Changes from Phase 1'), a pooled estimate across phases would not be scientifically meaningful.
 
-Run Phase 2 under a new `EXPERIMENT.id` in `experiment.js` (for example `smith2016-phase2`) and set `experiment_id_phase2` at the top of this file to match, so the two phases' data never mix.
-:::
 
 ## Results
 
@@ -808,30 +766,147 @@ if (!have_phase2) {
 }
 ```
 
+### Sample
+
+```{r}
+#| label: phase2-funnel
+#| eval: !expr have_phase2
+# Same steps as the Phase 1 funnel. Loaded and excluded by read_phase(), so Phase 2 uses the
+# Phase 1 exclusion rule.
+funnel_levels <- c("Started", "Completed", "Passed exclusion criteria")
+bind_rows(
+  phase2$participants |> mutate(step = "Started"),
+  phase2$complete     |> mutate(step = "Completed"),
+  phase2$keep         |> mutate(step = "Passed exclusion criteria")
+) |>
+  mutate(step = factor(step, levels = funnel_levels)) |>
+  count(step, condition, .drop = FALSE) |>
+  pivot_wider(names_from = condition, values_from = n, values_fill = 0) |>
+  mutate(Total = rowSums(across(-step))) |>
+  rename(Step = step) |>
+  knitr::kable(caption = "Phase 2: participants at each step, by condition (response-key assignment).")
+```
+
+```{r}
+#| label: phase2-sample-text
+#| eval: !expr have_phase2
+#| echo: false
+#| results: asis
+cat(sprintf("Of %d participants who started Phase 2, %d completed the study and %d met the exclusion criteria.",
+            nrow(phase2$participants), nrow(phase2$complete), nrow(phase2$keep)))
+if (phase2$n_no_response > 0) {
+  cat(sprintf(" %d completed session(s) contained no response to any speeded trial and were excluded on that basis.",
+              phase2$n_no_response))
+}
+if (nrow(phase2$keep) == 0) cat(" No participants remain for analysis yet, so the results below are empty.")
+cat("\n")
+```
+
+```{r}
+#| label: phase2-demographics
+#| eval: !expr have_phase2
+p2_demo <- phase2$trials |>
+  filter(task == "demographics", participant_id %in% phase2$keep$participant_id) |>
+  mutate(resp = map(response, ~ fromJSON(.x))) |>
+  transmute(
+    participant_id,
+    age    = map_dbl(resp, ~ as.numeric(.x$age %||% NA)),
+    gender = map_chr(resp, ~ as.character(.x$gender %||% NA))
+  )
+
+if (nrow(p2_demo) > 0) {
+  p2_demo |>
+    summarise(N = n(), `Mean age` = round(mean(age, na.rm = TRUE), 1),
+              `SD age` = round(sd(age, na.rm = TRUE), 1),
+              `Age not given` = sum(is.na(age))) |>
+    knitr::kable(caption = "Phase 2: age of the analysed sample.")
+}
+```
+
+### Confirmatory analysis
+
 ```{r}
 #| label: phase2-results
 #| eval: !expr have_phase2
-p2_counts <- risky_counts(phase2)
-p2_stats  <- diff_ci(p2_counts)
-cat(sprintf("Phase 2: %d started, %d completed, %d analysed.\n",
-            nrow(phase2$participants), nrow(phase2$complete), nrow(phase2$keep)))
-if (!is.null(p2_stats)) {
-  p_text <- if (p2_stats$p < 0.001) "p < .001" else sprintf("p = %.3f", p2_stats$p)
-  cat(sprintf("Key comparison: %.0f points [%.0f, %.0f], chi-square(1) = %.2f, %s.\n",
-              100 * p2_stats$estimate, 100 * p2_stats$ci_low, 100 * p2_stats$ci_high,
-              p2_stats$statistic, p_text))
+# Same key test as Phase 1, on the Phase 2 data alone: two-tailed paired t-test of parse
+# probability at community transitions vs. other images, for all parsing trials (the key test)
+# and for Hamiltonian paths only.
+p2_probs <- parse_probs(phase2)
+p2_tests <- parse_test(p2_probs)
+
+if (nrow(p2_tests) == 0) {
+  message("Paired t-test not run: it needs at least two analysed participants; there are ",
+          n_distinct(p2_probs$participant_id), ".")
+}
+if (nrow(p2_tests) > 0) {
+  p2_probs |>
+    group_by(Trials = paths, type) |>
+    summarise(`Mean parse probability` = round(mean(p), 3), SD = round(sd(p), 3), N = n(), .groups = "drop") |>
+    knitr::kable(caption = "Phase 2: parse probability by opportunity type, mean and SD across analysed participants.")
+}
+if (nrow(p2_tests) > 0) {
+  p2_tests |>
+    transmute(Trials = paths, N, t = sprintf("t(%d) = %.2f", as.integer(df), t),
+              p = format.pval(p, digits = 2, eps = 0.001),
+              `d_z [95% CI]` = sprintf("%.2f [%.2f, %.2f]", estimate, ci_low, ci_high)) |>
+    knitr::kable(caption = "Phase 2: paired t-tests, community transition vs. other parse probability.")
+}
+```
+
+### Replication assessment
+
+```{r}
+#| label: phase2-comparison
+#| eval: !expr have_phase2
+p2_rep <- key_test(phase2)
+p1_rep <- if (have_data) key_test(phase1)
+
+if (!is.null(p2_rep)) {
+  bind_rows(original_key |> mutate(Study = "Original (Exp. 2)"),
+            if (!is.null(p1_rep)) p1_rep |> mutate(Study = "Phase 1: replication"),
+            p2_rep |> mutate(Study = "Phase 2: extension")) |>
+    transmute(Study, N,
+              `Effect (d_z)` = sprintf("%.2f", estimate),
+              `95% CI` = sprintf("[%.2f, %.2f]", ci_low, ci_high),
+              p = format.pval(p, digits = 2, eps = 0.001)) |>
+    knitr::kable(caption = "Effect size: Cohen's d_z for community transition vs. other parse probability, all trials. The original's d_z and CI are recomputed from its reported t9 = 2.30.")
+} else {
+  message("Phase 2 effect size not computed yet: need at least two analysed participants.")
+}
+```
+
+```{r}
+#| label: phase2-comparison-verdict
+#| eval: !expr have_phase2
+#| echo: false
+#| results: asis
+if (!is.null(p2_rep)) {
+  excludes_zero <- p2_rep$ci_low > 0 | p2_rep$ci_high < 0
+  includes_orig <- original_key$estimate >= p2_rep$ci_low & original_key$estimate <= p2_rep$ci_high
+  cat(sprintf(
+    "The Phase 2 95%% interval %s zero and %s the original estimate of d_z = %.2f. ",
+    if (excludes_zero) "excludes" else "includes",
+    if (includes_orig) "includes" else "does not include",
+    original_key$estimate))
+  cat("These two facts are the starting point for the Phase 2 Discussion, not the conclusion.\n")
 }
 ```
 
 ```{r}
 #| label: fig-phase2
 #| eval: !expr have_phase2
-#| fig-cap: "Percentage choosing the risky program in each frame: original study, Phase 1 replication, and Phase 2 extension. Error bars are 95% confidence intervals."
-#| fig-width: 8
+#| fig-cap: "Proportion of opportunities on which analysed participants parsed at a community transition and at non-transition images, for all parsing trials and for Hamiltonian paths only: original study (Schapiro et al., 2013, Exp. 2, Fig. 2b, values read from the figure), Phase 1 replication, and Phase 2 extension. Error bars are ±1 SEM across participants; * p < .05, n.s. = not significant, paired t-test."
+#| fig-width: 12
 #| fig-height: 4
-comparison_plot(Original = original,
-                `Phase 1: replication` = if (have_data) risky_counts(phase1),
-                `Phase 2: extension` = risky_counts(phase2))
+p2_probs <- parse_probs(phase2)
+if (nrow(p2_probs) > 0) {
+  studies <- list(`Original (Schapiro et al., 2013, Exp. 2)` = list(means = original_fig2b, tests = original))
+  p1_probs <- if (have_data) parse_probs(phase1)
+  if (!is.null(p1_probs) && nrow(p1_probs) > 0)
+    studies$`Phase 1: replication` <- list(means = parse_means(p1_probs), tests = parse_test(p1_probs))
+  studies$`Phase 2: extension` <- list(means = parse_means(p2_probs), tests = parse_test(p2_probs))
+  do.call(parse_plot, studies)
+} else message("No analysed Phase 2 participants yet, so there is nothing to plot.")
 ```
 
 ## Discussion
@@ -844,10 +919,4 @@ Compare Phase 2 with Phase 1 and with the original, using the Key statistics tab
 
 # Data and code availability
 
-::: {.callout-tip icon="false"}
-## Guidance
-
-Edit the statement below to match what you are actually sharing. Anonymized data and all code should be public; if something cannot be shared, say what and why.
-:::
-
-The experiment code, the anonymized data, and the code that produces every number in this report are available at <https://github.com/psych251/your-repo>. The experiment itself can be taken at <https://psych251.github.io/your-repo/>. The data contain no names, email addresses, IP addresses, or Prolific IDs; the file linking participants to their Prolific IDs is kept privately for payment and is not shared.
+The experiment code, the anonymized data, and the code that produces every number in this report are available at <https://github.com/psych251/schapiro2013>. The experiment itself can be taken at <https://psych251.github.io/schapiro2013/>. The data contain no names, email addresses, IP addresses, or Prolific IDs; the file linking participants to their Prolific IDs is kept privately for payment and is not shared.
