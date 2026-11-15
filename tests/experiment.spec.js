@@ -14,7 +14,7 @@ const { test, expect, devices } = require("@playwright/test");
 
 const EMULATOR = process.env.EMULATOR === "1" || !!process.env.FIRESTORE_EMULATOR_HOST;
 const PROJECT = "demo-psych251";
-const EXPERIMENT_ID = "schapiro2013-pilot-a";
+const EXPERIMENT_ID = "schapiro2013-phase2";
 const FS = `http://localhost:8080/v1/projects/${PROJECT}/databases/(default)/documents`;
 
 // A short version of the study so the robot finishes in seconds: 12 exposure images with a
@@ -49,21 +49,51 @@ async function runThroughExperiment(page, { stopBeforeFinish = false, demographi
   await page.locator('input[value="Continue"]').click();
   // 4. exposure: two instruction pages, then the rotation task with a break every few images
   await page.locator("#jspsych-instructions-next").click();
+  // Phase 2 #1: the keys are listed in keyboard order, F before J.
+  const keyList = await page.locator(".jspsych-content li").allTextContents();
+  expect(keyList.map((t) => t.trim()[0])).toEqual(["F", "J"]);
   await page.locator("#jspsych-instructions-next").click();
   const keys = await page.evaluate(() => window.__exp);
+  // Phase 2 #2: four practice images (original-rotated-original-rotated), each followed by
+  // feedback. The robot gets the first one wrong to see both kinds of feedback.
+  for (let i = 0; i < 4; i++) {
+    const stim = page.locator(`.practice-stim[data-seq="p${i}"]`);
+    await stim.waitFor({ state: "visible" });
+    const rotated = await stim.evaluate((el) => el.classList.contains("rotated"));
+    expect(rotated).toBe(i % 2 === 1);
+    const right = rotated ? keys.rotated_key : keys.upright_key;
+    const wrong = rotated ? keys.upright_key : keys.rotated_key;
+    await page.keyboard.press(i === 0 ? wrong : right);
+    // Phase 2 #4: thumbs up or cross as soon as the key is pressed.
+    await expect(page.locator("#fb-slot")).toHaveText(i === 0 ? "❌" : "\u{1F44D}\u{1F3FC}");
+    await expect(page.locator(".practice-fb")).toContainText(i === 0 ? "Not quite" : "Correct");
+  }
+  await expect(page.getByText("You got 3 of 4 right")).toBeVisible();
+  await page.getByRole("button", { name: "Start" }).click();
   for (let i = 0; i < SHORT.n_exposure; i++) {
-    if (i > 0 && i % SHORT.break_every === 0) await page.getByRole("button", { name: "Continue" }).click();
+    if (i > 0 && i % SHORT.break_every === 0) {
+      // Phase 2 #5: end-of-level feedback on the break screen.
+      await expect(page.getByText("Level 1 of 2 complete")).toBeVisible();
+      await page.getByRole("button", { name: "Continue" }).click();
+    }
     const stim = page.locator(`.exposure-stim[data-seq="${i}"]`);
     await stim.waitFor({ state: "visible" });
     const rotated = await stim.evaluate((el) => el.classList.contains("rotated"));
     await page.keyboard.press(rotated ? keys.rotated_key : keys.upright_key);
   }
+  // The last level has no break after it, so its result gets a screen of its own.
+  await expect(page.getByText("Level 2 of 2 complete")).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
   // 5. parsing: one instruction page, then the spacebar task
   await page.locator("#jspsych-instructions-next").click();
   for (let i = 0; i < N_PARSE; i++) {
     const stim = page.locator(`.parse-stim[data-seq="${i}"]`);
     await stim.waitFor({ state: "visible" });
-    if (robotParses(i)) await page.keyboard.press(" ");
+    if (robotParses(i)) {
+      await page.keyboard.press(" ");
+      // Phase 2 #4: scissors on a parse.
+      if (i === 2) await expect(page.locator("#fb-slot")).toHaveText("✂️");
+    }
   }
   // 6. feedback
   await page.locator("#jspsych-survey-likert-next").waitFor({ state: "visible" });
@@ -161,6 +191,13 @@ test.describe("experiment", () => {
     expect(exposure.filter((t) => t.correct).length).toBeGreaterThanOrEqual(SHORT.n_exposure - 1);
     expect(exposure.every((t) => t.stim === pdoc.node_stimuli[t.node])).toBe(true);
     expect(trials.filter((t) => t.task === "break").length).toBe(1);
+    // Phase 2: practice rows stay out of the exposure task; levels are recorded.
+    const practice = trials.filter((t) => t.task === "practice");
+    expect(practice.map((t) => t.rotated)).toEqual([false, true, false, true]);
+    expect(new Set(practice.map((t) => t.stim)).size).toBe(4);
+    expect(practice.map((t) => t.correct)).toEqual([false, true, true, true]);
+    expect(exposure.map((t) => t.level)).toEqual([...Array(6).fill(1), ...Array(6).fill(2)]);
+    expect(trials.find((t) => t.task === "level_end").level).toBe(2);
     const parsing = trials.filter((t) => t.task === "parsing");
     expect(parsing.length).toBe(N_PARSE);
     expect(parsing.map((t) => t.walk_type)).toEqual(

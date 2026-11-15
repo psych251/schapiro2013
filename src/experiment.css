@@ -17,3 +17,26 @@
 .stim-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 1em 0; }
 .grid-stim { width: 100%; height: auto; display: block; }
 .missing-msg { color: #b00020; font-weight: 600; }
+/* Phase 2 #3, #4: emoji feedback slot (fixed height, so the image never moves) and the task
+   reminder under each image. */
+.fb-slot { height: 44px; line-height: 44px; font-size: 34px; text-align: center; margin-top: 6px; }
+.fb-slot.pop { animation: fb-pop 0.25s ease-out; }
+@keyframes fb-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.reminder { text-align: center; font-size: 15px; color: #444; margin: 4px 0 0; }
+.practice-feedback { min-height: 300px; display: flex; flex-direction: column; justify-content: center; }
+.practice-fb { text-align: center; font-size: 26px; font-weight: 700; }
+.practice-fb.ok { color: #1b7a33; }
+.practice-fb.bad { color: #b00020; }
+/* Phase 2 #5: level, score and streak above the image; end-of-level banners and confetti. */
+.hud { width: 300px; margin: 0 auto 8px; font-size: 15px; }
+.hud-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.hud-level { font-weight: 700; }
+.hud-bar { height: 8px; background: #e3e3e3; border-radius: 4px; overflow: hidden; }
+.hud-fill { height: 100%; background: #3a7bd5; }
+.banner { text-align: center; font-size: 26px; font-weight: 800; animation: banner-pulse 0.9s ease-in-out 3; }
+.banner.beat { color: #1b7a33; }
+.banner.best { color: #c77700; text-shadow: 0 0 8px rgba(255, 190, 0, 0.6); }
+@keyframes banner-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.confetti span { position: absolute; top: -40px; font-size: 28px; animation: confetti-fall 2.4s ease-in forwards; }
+@keyframes confetti-fall { to { transform: translateY(110vh) rotate(540deg); opacity: 0.2; } }

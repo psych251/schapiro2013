@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="-150 -150 300 300">
+<defs>
+  <radialGradient id="bg4" cx="0" cy="0" r="148" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="hsla(0,0%,95.7%,1.00)"/>
+    <stop offset="1" stop-color="hsla(0,0%,26.2%,1.00)"/>
+  </radialGradient>
+  <clipPath id="disc4"><circle r="148"/></clipPath>
+  <g id="m4">
+<ellipse cx="-88.9" cy="77.4" rx="40.3" ry="9.2" transform="rotate(136.8 -88.9 77.4)" fill="hsla(0,0%,36.6%,0.68)"/>
+<ellipse cx="73.5" cy="71.5" rx="46.5" ry="20.8" transform="rotate(75.9 73.5 71.5)" fill="hsla(0,0%,36.1%,0.66)"/>
+<ellipse cx="44.5" cy="71.7" rx="46.0" ry="17.6" transform="rotate(44.3 44.5 71.7)" fill="hsla(0,0%,38.1%,0.56)"/>
+<ellipse cx="-3.5" cy="64.6" rx="20.5" ry="5.3" transform="rotate(68.3 -3.5 64.6)" fill="hsla(0,0%,66.3%,0.66)"/>
+<path d="M -6.4 0.0 C -45.2 -59.8, 73.4 -110.6, 120.9 -7.2" fill="none" stroke="hsla(0,0%,93.9%,0.90)" stroke-width="4.6" stroke-linecap="round"/>
+<path d="M 24.5 8.4 C 59.8 40.9, 57.5 82.3, 41.1 116.9" fill="none" stroke="hsla(0,0%,84.3%,0.90)" stroke-width="11.0" stroke-linecap="round"/>
+<path d="M 3.0 19.6 C -2.1 51.4, -37.6 121.1, -54.9 101.5" fill="none" stroke="hsla(0,0%,6.1%,0.90)" stroke-width="3.8" stroke-linecap="round"/>
+<path d="M -33.4 2.4 C -39.6 -28.3, -3.5 -121.9, 93.3 -119.6" fill="none" stroke="hsla(0,0%,0.7%,0.90)" stroke-width="7.8" stroke-linecap="round"/>
+<circle cx="52.4" cy="35.0" r="7.4" fill="hsla(0,0%,6.1%,0.95)"/>
+<circle cx="58.5" cy="40.6" r="6.5" fill="hsla(0,0%,13.8%,0.95)"/>
+  </g>
+</defs>
+<g clip-path="url(#disc4)">
+<circle r="148" fill="url(#bg4)"/>
+<use href="#m4" transform="rotate(0.0)"/>
+<use href="#m4" transform="rotate(0.0) scale(1,-1)"/>
+<use href="#m4" transform="rotate(180.0)"/>
+<use href="#m4" transform="rotate(180.0) scale(1,-1)"/>
+<circle r="73.2" fill="none" stroke="hsla(0,0%,4.3%,0.80)" stroke-width="4.8"/>
+<circle r="58.7" fill="none" stroke="hsla(0,0%,96.4%,0.80)" stroke-width="4.0"/>
+</g>
+<circle r="148" fill="none" stroke="hsla(0,0%,30.0%,1.00)" stroke-width="1.5"/>
+</svg>

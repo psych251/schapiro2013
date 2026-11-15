@@ -1,6 +1,7 @@
 // Generate the 15 abstract stimuli used by experiment.js (stimuli/stim-01.svg ... stim-15.svg).
 //
-//   node scripts/make-stimuli.js
+//   node scripts/make-stimuli.js                 Phase 1 set (orders 2, 3, 6) -> stimuli/
+//   node scripts/make-stimuli.js --set phase2    Phase 2 set (all 2-fold)     -> stimuli-phase2/
 //
 // Stand-ins for the ArtMatic Pro images of Schapiro et al. (2013), Experiment 2, which are
 // not distributed with the paper. Like the originals (Fig. 1c) they are grayscale, circular
@@ -21,8 +22,12 @@ const path = require("path");
 const N = 15;
 const SIZE = 300;
 const R = 148; // circle radius; the image is drawn in coordinates centred on (0, 0)
-const ORDERS = [2, 3, 6];
-const outDir = path.join(__dirname, "..", "stimuli");
+// Phase 2 uses only 2-fold images, where a 90-degree turn is a full 90-degree change (in Phase 1
+// rotations of 2-fold images were detected most often), with its own seeds so no image repeats.
+const PHASE2 = process.argv.includes("--set") && process.argv[process.argv.indexOf("--set") + 1] === "phase2";
+const ORDERS = PHASE2 ? [2] : [2, 3, 6];
+const SEED_BASE = PHASE2 ? 252 * 1000 : 251 * 1000;
+const outDir = path.join(__dirname, "..", PHASE2 ? "stimuli-phase2" : "stimuli");
 
 // mulberry32: small seeded PRNG so the set is reproducible.
 function rng(seed) {
@@ -39,7 +44,7 @@ const f = (x) => x.toFixed(1);
 const polar = (rho, deg) => [rho * Math.cos((deg * Math.PI) / 180), rho * Math.sin((deg * Math.PI) / 180)];
 
 function makeImage(i) {
-  const r = rng(251 * 1000 + i);
+  const r = rng(SEED_BASE + i);
   const between = (a, b) => a + (b - a) * r();
   const n = ORDERS[(i - 1) % ORDERS.length];
   const wedge = 360 / n;

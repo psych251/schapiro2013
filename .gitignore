@@ -62,4 +62,10 @@ identifiers.csv
 .claude/worktrees/
 
 code_edit.qmd
-writeup/optional_stopping/
+writeup/phase_1_analyses.md
+
+data/raw/schapiro2013-final/
+data/raw/schapiro2013-pilot-a/
+data/raw/schapiro2013-pilot-b/
+
+SKILL.md

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="-150 -150 300 300">
+<defs>
+  <radialGradient id="bg6" cx="0" cy="0" r="148" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="hsla(0,0%,86.5%,1.00)"/>
+    <stop offset="1" stop-color="hsla(0,0%,25.0%,1.00)"/>
+  </radialGradient>
+  <clipPath id="disc6"><circle r="148"/></clipPath>
+  <g id="m6">
+<ellipse cx="75.1" cy="25.5" rx="52.5" ry="19.0" transform="rotate(44.6 75.1 25.5)" fill="hsla(0,0%,96.6%,0.73)"/>
+<ellipse cx="-43.0" cy="43.6" rx="23.8" ry="5.8" transform="rotate(101.4 -43.0 43.6)" fill="hsla(0,0%,85.6%,0.84)"/>
+<ellipse cx="-10.8" cy="77.6" rx="49.3" ry="23.1" transform="rotate(118.1 -10.8 77.6)" fill="hsla(0,0%,14.5%,0.83)"/>
+<path d="M 27.9 3.2 C 71.0 -67.1, -43.8 -121.2, -134.7 -49.8" fill="none" stroke="hsla(0,0%,11.1%,0.90)" stroke-width="6.1" stroke-linecap="round"/>
+<path d="M 36.4 2.0 C 28.7 -59.7, -91.2 -44.0, -88.1 78.4" fill="none" stroke="hsla(0,0%,2.1%,0.90)" stroke-width="11.3" stroke-linecap="round"/>
+<path d="M -19.0 26.3 C -59.9 78.4, -58.8 71.6, -72.9 84.1" fill="none" stroke="hsla(0,0%,83.6%,0.90)" stroke-width="10.0" stroke-linecap="round"/>
+<path d="M 2.0 1.4 C 78.5 52.0, 117.2 70.7, 114.0 64.0" fill="none" stroke="hsla(0,0%,9.1%,0.90)" stroke-width="6.2" stroke-linecap="round"/>
+<circle cx="2.6" cy="80.8" r="6.4" fill="hsla(0,0%,3.6%,0.95)"/>
+<circle cx="-56.8" cy="12.8" r="9.0" fill="hsla(0,0%,0.0%,0.95)"/>
+<circle cx="73.7" cy="81.1" r="9.3" fill="hsla(0,0%,5.0%,0.95)"/>
+  </g>
+</defs>
+<g clip-path="url(#disc6)">
+<circle r="148" fill="url(#bg6)"/>
+<use href="#m6" transform="rotate(0.0)"/>
+<use href="#m6" transform="rotate(180.0)"/>
+
+</g>
+<circle r="148" fill="none" stroke="hsla(0,0%,30.0%,1.00)" stroke-width="1.5"/>
+</svg>

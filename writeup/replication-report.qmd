@@ -351,7 +351,7 @@ The experiment requires 15 distinct visual stimuli with circular boundaries that
 Once participants access the website, they must agree to the consent form presented on the first page. After a welcoming message, they are instructed to turn on audio, as they will receive audio feedback during the experiment. Then, they are prompted to provide demographics including age, gender, and first language.
 
 #### Exposure phase (35 minutes + 4 short breaks)
-The exposure phase begins with participants viewing 50 abstract images with circular boundaries. The instructions specify that these images are in their normal orientation, but in the following experiment, participants will be asked whether each image is rotated from its normal orientation. Participants can take as much time as needed to familiarize themselves with the images. On the next page, more detailed instructions—including the keys to press to indicate rotation—are provided. The instructions also clarify that participants will receive audio feedback for incorrect responses or failure to respond during stimulus presentation.
+The exposure phase begins with participants viewing 15 abstract images with circular boundaries. The instructions specify that these images are in their normal orientation, but in the following experiment, participants will be asked whether each image is rotated from its normal orientation. Participants can take as much time as needed to familiarize themselves with the images. On the next page, more detailed instructions—including the keys to press to indicate rotation—are provided. The instructions also clarify that participants will receive audio feedback for incorrect responses or failure to respond during stimulus presentation.
 
 Then, the test phase begins. Participants view a sequence of 1,400 images, one at a time, for 1.5 seconds each. They press key J if they think the image is rotated and key F if they think it is in its original orientation. A low-frequency beep plays for incorrect responses and a higher-frequency beep for missed responses during the 1.5-second stimulus presentation window. Every 7 minutes, participants can choose to take a short break.
 
@@ -363,7 +363,7 @@ Once participants complete the parsing phase, a brief feedback page appears. Par
 
 ### Analysis plan
 
-**Key analysis of interest.** For both random walk-generated part of the sequence and Hamiltonian path-generated part of the sequence, the proportion of break points placed at community transitions is higher than the proportion of break points placed somewhere else, tested with a two-tailed paired-samples t-test. The effect size is Cohen's d_z computed as (p_{community transition} - p_{other}), with a 95% confidence interval.
+**Key analysis of interest.** For both random walk-generated part of the sequence and Hamiltonian path-generated part of the sequence, the proportion of break points placed at community transitions is higher than the proportion of break points placed somewhere else, tested with a two-tailed paired-samples t-test. The effect size is Cohen's d_z with a 95% confidence interval.
 
 **Exclusions.** Participants are excluded if they did not complete the study, scored less than 50% in the exposure phase, responded to less than 70% of the stimuli in the exposure phase,or they took more than one hour and half to complete the entire study.
 
@@ -425,7 +425,7 @@ bind_rows(
   pivot_wider(names_from = condition, values_from = n, values_fill = 0) |>
   mutate(Total = rowSums(across(-step))) |>
   rename(Step = step) |>
-  knitr::kable(caption = "Participants at each step, by frame. Differences between frames in attrition or exclusion are a threat to validity and should be discussed.")
+  knitr::kable(caption = "Participants at each step, by condition (response-key assignment).")
 ```
 
 ```{r}
@@ -466,7 +466,7 @@ if (nrow(demo) > 0) {
 
 #### Deviations from the preregistered plan
 
-None.
+In the preregistration, I planned to analyze 17 participants, which is the sample size that provides 80% power to detect the original effect. However, I ended up analyzing 11 participants, who have passed the exclusion criteria. The minimum effect detectable with 80% power is d_z = 0.94, smaller than the original 0.73.
 
 ## Results
 
@@ -561,7 +561,7 @@ I hypothesize that the similarities between the images may account for the parsi
 
 To explore this, I computed the cosine similarity between pixel values of every consecutive pair in the sequence during the parsing phase. I then compared the mean similarity of the transitions that participants parsed with the mean similarity of the transitions that they did not parse.
 
-As a result, I found that the mean similarity of the 'parsing' transitions was not significantly different from the mean similarity of the 'non-parsing' transitions (t(10) = −0.22, p = 0.83). This suggests that visual similarity of the images does not account for the parsing effect.
+As a result, I found that the mean similarity of the 'parsing' transitions was not significantly different from the mean similarity of the 'non-parsing' transitions (t(10) = −0.22, p = 0.83). This suggests that visual similarity of the images does not account for the parsing behavior.
 
 
 ```{r}
@@ -644,6 +644,68 @@ if (nrow(sim_wide) >= 2) {
 ```
 
 ```{r}
+#| label: robustness
+#| eval: !expr have_data
+# Exploratory robustness checks on the key test (not preregistered).
+# 1. Rotation-task sensitivity A' (the compliance measure the original reports: mean .818 in
+#    Exp. 2). The preregistered accuracy rule cannot catch a participant who ignores the images:
+#    with 20% rotated trials, always pressing the "upright" key scores 80%.
+# 2. The key test under alternative codings the paper mentions or leaves open: the community-run
+#    threshold (Supplementary Table 2 uses 1-3 and 5 steps as well as 4), counting short-run
+#    transitions as "other" opportunities, and a press on the image after a transition.
+a_prime <- function(H, FA) ifelse(H >= FA, 0.5 + ((H - FA) * (1 + H - FA)) / (4 * H * (1 - FA)),
+                                  0.5 - ((FA - H) * (1 + FA - H)) / (4 * FA * (1 - H)))
+sdt <- trials |>
+  filter(task == "exposure", participant_id %in% complete$participant_id, !as.logical(timed_out)) |>
+  mutate(rotated = as.logical(rotated), correct = as.logical(correct)) |>
+  group_by(participant_id) |>
+  summarise(H = mean(correct[rotated]), FA = mean(!correct[!rotated]), .groups = "drop") |>
+  mutate(a_prime = a_prime(H, FA), analysed = participant_id %in% keep$participant_id)
+sdt |>
+  group_by(Sample = if_else(analysed, "Analysed", "Excluded")) |>
+  summarise(N = n(), `Hit rate` = mean(H), `False-alarm rate` = mean(FA),
+            `Mean A'` = mean(a_prime), `SD A'` = sd(a_prime), `A' < .6` = sum(a_prime < 0.6),
+            .groups = "drop") |>
+  knitr::kable(digits = 3, caption = "Exploratory: rotation-detection sensitivity (A') in the exposure phase, completed sessions. Original Exp. 2: mean A' = 0.818, SD = 0.130.")
+
+# Paired t on all trials for one coding of the parsing data.
+robust_test <- function(ids, threshold = 4, other_incl_short = FALSE, lag = 0) {
+  trials |>
+    filter(task == "parsing", participant_id %in% ids) |>
+    arrange(participant_id, trial_index) |>
+    group_by(participant_id) |>
+    mutate(parsed = lead(as.logical(parsed), lag, default = FALSE)) |>
+    ungroup() |>
+    mutate(community_change = as.logical(community_change),
+           type = case_when(community_change & prev_run >= threshold ~ "trans",
+                            other_incl_short | !community_change ~ "other")) |>
+    filter(!is.na(type)) |>
+    group_by(participant_id, type) |>
+    summarise(p = mean(parsed), .groups = "drop") |>
+    pivot_wider(names_from = type, values_from = p) |>
+    drop_na() |>
+    summarise(N = n(), `Transition` = mean(trans), `Other` = mean(other),
+              t = unname(t.test(trans, other, paired = TRUE)$statistic),
+              p = t.test(trans, other, paired = TRUE)$p.value) |>
+    mutate(d_z = t / sqrt(N))
+}
+ids_keep <- keep$participant_id
+bind_rows(
+  `Preregistered (>= 4 steps)`                    = robust_test(ids_keep),
+  `>= 1 step`                                     = robust_test(ids_keep, threshold = 1),
+  `>= 2 steps`                                    = robust_test(ids_keep, threshold = 2),
+  `>= 3 steps`                                    = robust_test(ids_keep, threshold = 3),
+  `>= 5 steps`                                    = robust_test(ids_keep, threshold = 5),
+  `Short-run transitions counted as other`        = robust_test(ids_keep, other_incl_short = TRUE),
+  `Press on the following image`                  = robust_test(ids_keep, lag = 1),
+  `Analysed and A' >= .6`                         = robust_test(intersect(ids_keep, sdt$participant_id[sdt$a_prime >= 0.6])),
+  `All completed sessions, no exclusions`         = robust_test(complete$participant_id),
+  .id = "Coding") |>
+  mutate(p = format.pval(p, digits = 2, eps = 0.001)) |>
+  knitr::kable(digits = 3, caption = "Exploratory: key test (all trials, paired t) under alternative codings. Transition and Other are mean parse probabilities.")
+```
+
+```{r}
 #| label: data-quality
 #| eval: !expr have_data
 if (nrow(errors) > 0) {
@@ -677,18 +739,20 @@ Another challenge is attention drift throughout the long experiment (minimum 50 
 
 ## Rationale
 
-For the rescue strategy, I want to point out two possible reasons that might have contributed to the failure to replicate the original result. First, the instructions I gave to the participants may have been confusing, which may have led to some participants pressing the wrong key for the rotated and normal images. To address this, I plan to revise the instructions and add practice trials. Second, participants may have become fatigued or inattentive during the long experiment, which may have affected their performance. To prevent this, I plan to design the task more like a game, with levels, scores, streaks, and feedback to keep the participants engaged.
+For the rescue strategy, I want to point out two possible reasons that might have contributed to the failure to replicate the original result. First, the instructions I gave to the participants may have been confusing, which may have led to some participants pressing the wrong key for the rotated and normal images. To address this, I plan to revise the instructions and add practice trials. Second, participants may have become fatigued or inattentive during the long experiment, which may have affected their performance. To prevent this, I plan to shorten the exposure phase and design the tasks more like a game, with levels, scores, streaks, and feedback to keep the participants engaged.
 
 ## Changes from Phase 1
 
 
 | \# | Category | Phase 1 | Phase 2 | Why |
 |---------------|---------------|---------------|---------------|---------------|
-| 1 | Instructions | The instruction about the keys (F and J) to press for the original and rotated images, which are randomly assigned to individual participants, was always ordered rotation first and original next. This can be confusing for participants with the rotation--J and original--F scenario, because it opposes the actual locations of the keys on the keyboard (J is on the right, F is on the left). | The revised instruction will always mention F first and then J with their role (rotated or original). | The original instruction is confusing, as strongly suggested by the Phase 1 data. |
-| 2 | Checks | No practice trial for the exposure phase | After the instructions, participants go through short practice trials of 4 distinct images (original-rotated-original-rotated), followed by immediate feedback. | It helps the participants understand the instructions and practice. |
-| 3 | Instructions | There are no reminder instructions during the actual phases. | The reminder instructions that describe the task are placed right below the images, both for the exposure and the parsing phases. | It helps the participants remember the task. |
-| 4 | Design | The participants only got sound feedback during the exposure phase, informing whether their guess (original vs. rotated) was correct. | When the participants get the original/rotated images correct, a thumbs-up emoji (👍🏼) will pop up. An X emoji (❌) will pop up when wrong. Similarly, when the participants parse the sequence during the parsing phase, I will show a scissors emoji (✂️). | It helps the participants get engaged in the experiment and focus better. |
-| 5 | Design (Optional) | During the exposure phase, the participants don't get feedback about their performance throughout the session, and whether they are getting better over time. | The exposure phase, which consists of 5 consecutive blocks with breaks in between, is now designed like a game with levels. Each block is a level, and the participants are shown "Level N of 5" with a progress bar. The screen shows score and streaks for the rotation task on each level. Also, at each break, the participants get feedback on their performance. Starting from the second round, when the participants' score for that round beats the previous round's score, this is shown with text effect and sound. Likewise, if the participants beat their best score throughout all rounds, the participants get a special effect with sound. | It motivates the participants to focus and perform better on the task. |
+| 1 | Samples | 17 participants | 34 participants | To ensure 80% power of assumed effect size, d_z = 0.5. |
+| 2 | Instructions | The instruction about the keys (F and J) to press for the original and rotated images, which are randomly assigned to individual participants, was always ordered rotation first and original next. This can be confusing for participants with the rotation--J and original--F scenario, because it opposes the actual locations of the keys on the keyboard (J is on the right, F is on the left). | The revised instruction will always mention F first and then J with their role (rotated or original). | The original instruction is confusing, as strongly suggested by the Phase 1 data. |
+| 3 | Checks | No practice trial for the exposure phase | After the instructions, participants go through short practice trials of 4 distinct images (original-rotated-original-rotated), followed by immediate feedback. | It helps the participants understand the instructions and practice. |
+| 4 | Instructions | There are no reminder instructions during the actual phases. | The reminder instructions that describe the task are placed right below the images, both for the exposure and the parsing phases. | It helps the participants remember the task. |
+| 5 | Design | The exposure phase consists of 5 consecutive blocks with breaks in between. | The exposure phase consists of 3 consecutive blocks with breaks in between. | It reduces the participants' fatigue and helps them stay focused and attentive throughout the experiment. |
+| 6 | Design | The participants only got sound feedback during the exposure phase, informing whether their guess (original vs. rotated) was correct. | When the participants get the original/rotated images correct, a thumbs-up emoji (👍🏼) will pop up. An X emoji (❌) will pop up when wrong. Similarly, when the participants parse the sequence during the parsing phase, I will show a scissors emoji (✂️). | It helps the participants get engaged in the experiment and focus better. |
+| 7 | Design (Optional) | During the exposure phase, the participants don't get feedback about their performance throughout the session, and whether they are getting better over time. | The exposure phase, which consists of 5 consecutive blocks with breaks in between, is now designed like a game with levels. Each block is a level, and the participants are shown "Level N of 5" with a progress bar. The screen shows score and streaks for the rotation task on each level. Also, at each break, the participants get feedback on their performance. Starting from the second round, when the participants' score for that round beats the previous round's score, this is shown with text effect and sound. Likewise, if the participants beat their best score throughout all rounds, the participants get a special effect with sound. | It motivates the participants to focus and perform better on the task. |
 
 The last item on the table is optional. Everything not listed above is identical to Phase 1.
 

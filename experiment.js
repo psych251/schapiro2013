@@ -8,7 +8,7 @@
  *   1. consent           course-wide consent text (required at the start of every study)
  *   2. instructions
  *   3. demographics      a multi-question survey page (jsPsych "survey" plugin, SurveyJS)
- *   4. exposure phase    all 15 images shown at once, then 1,400 images from a random walk on
+ *   4. exposure phase    all 15 images shown at once, a 4-image practice, then 1,120 images (4 blocks) from a random walk on
  *                        the community graph, 1.5 s each, no ISI. Cover task: press one key if
  *                        the image is rotated 90 degrees (about 20% of trials), another if not.
  *                        Beep at one pitch for a wrong key, another for no response in time.
@@ -20,7 +20,7 @@
  *   6. feedback          Likert + free text
  *   7. debrief           saves data, then shows thanks or redirects to Prolific
  *
- * Stimuli (stimuli/stim-01.svg ... stim-15.svg) are generated stand-ins for the original
+ * Stimuli (stimuli-phase2/stim-01.svg ... stim-15.svg; Phase 1 used stimuli/) are generated stand-ins for the original
  * ArtMatic Pro images; see scripts/make-stimuli.js. They are assigned to graph nodes at
  * random for each participant.
  */
@@ -33,7 +33,7 @@ window.TEMPLATE_VERSION = "0.1.0";
 const EXPERIMENT = {
   // Firestore path: experiments/<id>/participants/... Change it when you start a new study
   // so pilot data and real data never mix (e.g. "schapiro2013-pilot-a", "schapiro2013-final").
-  id: "schapiro2013-phase2",
+  id: "schapiro2013-phase2-pilot",
 
   // Trials per Firestore write. With ~2,000 image trials per participant, chunk_size 1 would
   // spend ~2,000 of the free tier's 20,000 writes/day on every participant. 50 gives ~45
@@ -57,7 +57,7 @@ const EXPERIMENT = {
   requires_keyboard: true,
 
   // ---- Design (Schapiro et al., 2013, Online Methods) ----
-  n_exposure: 1400,          // exposure-phase images (random walk)
+  n_exposure: 1120,          // exposure-phase images (random walk). Phase 2: 4 blocks of 280 (Phase 1: 1,400 = 5 blocks)
   n_parse_blocks: 40,        // parsing-phase blocks of 15 images (40 x 15 = 600)
   stim_ms: 1500,             // each image is shown for 1.5 s with no interstimulus interval
   p_rotated: 0.2,            // "rotated 90 degrees ... about 20% of the time"
@@ -65,6 +65,14 @@ const EXPERIMENT = {
   response_keys: ["f", "j"], // which of these means "rotated" is counterbalanced across participants
   beep_wrong_hz: 300,        // "a beep at one frequency ... when the response was incorrect"
   beep_slow_hz: 900,         // "... and at another frequency when the response was not within the time frame"
+
+  // ---- Phase 2 changes (report, "Changes from Phase 1") ----
+  // #2 practice: four distinct images, original-rotated-original-rotated, each followed by feedback.
+  practice_pattern: [false, true, false, true],
+  practice_feedback_ms: 1500,
+  // #4 emoji feedback is always on. #5 (optional) turns each exposure block into a level with
+  // a score, a streak and end-of-level feedback; set to false to drop it.
+  gamify: true,
 };
 
 // True on anything with a mouse, trackpad, or stylus, including laptops with touchscreens.
@@ -93,7 +101,8 @@ if (ALLOW_OVERRIDES) {
   }
 }
 
-const STIMULI = Array.from({ length: 15 }, (_, i) => "stimuli/stim-" + String(i + 1).padStart(2, "0") + ".svg");
+// Phase 2: all 2-fold images (scripts/make-stimuli.js --set phase2). Phase 1 used stimuli/.
+const STIMULI = Array.from({ length: 15 }, (_, i) => "stimuli-phase2/stim-" + String(i + 1).padStart(2, "0") + ".svg");
 
 // Beeps for the rotation task, via Web Audio (no sound files). The AudioContext has to be
 // created from a click, so it is started when the participant agrees to participate.
@@ -116,6 +125,26 @@ function beep(freq) {
   osc.start(t);
   osc.stop(t + 0.21);
 }
+// Phase 2 #5: short rising tunes for beating the previous level and for a new best.
+function tune(freqs, step = 0.12) {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  freqs.forEach((freq, i) => {
+    const t = t0 + i * step;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + step * 1.8);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + step * 2);
+  });
+}
+const TUNE_BEAT_PREVIOUS = [523, 659, 784];            // C5 E5 G5
+const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
 
 // ---------------------------------------------------------------------------
 // Boot: connect the saver first so even a crash in the first trial gets logged.
@@ -357,9 +386,56 @@ function beep(freq) {
   // 4. Exposure phase: rotation-detection cover task on a random walk
   // -------------------------------------------------------------------------
   const K = (k) => `<strong>${k.toUpperCase()}</strong>`;
-  const stimHtml = (cls, seqIndex, node, rotated) =>
+  const imgHtml = (cls, seqIndex, src, rotated) =>
     `<div class="stim-frame"><img class="stim ${cls}${rotated ? " rotated" : ""}" ` +
-    `data-seq="${seqIndex}" src="${nodeStim[node]}" alt=""></div>`;
+    `data-seq="${seqIndex}" src="${src}" alt=""></div>`;
+  const stimHtml = (cls, seqIndex, node, rotated) => imgHtml(cls, seqIndex, nodeStim[node], rotated);
+
+  // Phase 2 #1: keys are always described in keyboard order, F (left) first, then J (right).
+  const tv = (name) => jsPsych.timelineVariable(name);
+  const ev = (name) => jsPsych.evaluateTimelineVariable(name);
+  const keyRole = (k) => (k === rotatedKey ? "rotated" : "normal orientation");
+  const keysInOrder = ["f", "j"];
+  const keyListHtml = keysInOrder
+    .map((k) => `<li>${K(k)} if the image is ${k === rotatedKey ? "<strong>rotated</strong>" : "in its <strong>normal orientation</strong>"}</li>`)
+    .join("");
+  const keySentence = keysInOrder.map((k) => `${K(k)} = ${keyRole(k)}`).join(", ");
+
+  // Phase 2 #3 and #4: a feedback slot (emoji) and a task reminder under every image. The slot
+  // has a fixed height so the emoji appearing never moves the image.
+  const exposureReminder =
+    `<p class="reminder">Is the image rotated? ${keysInOrder.map((k) => `${K(k)} = ${keyRole(k)}`).join(" &nbsp;|&nbsp; ")}</p>`;
+  const parsingReminder =
+    `<p class="reminder">Press the <strong>spacebar</strong> at natural breaking points.</p>`;
+  const feedbackSlot = `<div class="fb-slot" id="fb-slot"></div>`;
+  const showEmoji = (emoji) => {
+    const slot = document.getElementById("fb-slot");
+    if (slot) { slot.textContent = emoji; slot.classList.remove("pop"); void slot.offsetWidth; slot.classList.add("pop"); }
+  };
+  const EMOJI_CORRECT = "\u{1F44D}\u{1F3FC}"; // thumbs up, medium-light skin tone
+  const EMOJI_WRONG = "❌";               // cross mark
+  const EMOJI_PARSE = "✂️";         // scissors
+
+  // Phase 2 #5 (optional): levels, score and streak. One level per exposure block.
+  const nLevels = Math.ceil(EXPERIMENT.n_exposure / EXPERIMENT.break_every);
+  const game = { level: 1, score: 0, streak: 0, done: 0, scores: [] };
+  const levelSize = (lvl) => Math.min(EXPERIMENT.break_every, EXPERIMENT.n_exposure - (lvl - 1) * EXPERIMENT.break_every);
+  const hudHtml = () => {
+    if (!EXPERIMENT.gamify) return "";
+    const pct = Math.round((100 * game.done) / levelSize(game.level));
+    return `<div class="hud">
+        <div class="hud-row"><span class="hud-level">Level ${game.level} of ${nLevels}</span>
+          <span class="hud-stats">Score: <strong id="hud-score">${game.score}</strong>
+          &nbsp; Streak: <strong id="hud-streak">${game.streak}</strong></span></div>
+        <div class="hud-bar"><div class="hud-fill" style="width:${pct}%"></div></div>
+      </div>`;
+  };
+  const updateHud = () => {
+    const s = document.getElementById("hud-score");
+    const k = document.getElementById("hud-streak");
+    if (s) s.textContent = game.score;
+    if (k) k.textContent = game.streak;
+  };
 
   const allImagesGrid = jsPsych.randomization.shuffle(STIMULI)
     .map((src) => `<img class="grid-stim" src="${src}" alt="">`).join("");
@@ -376,27 +452,84 @@ function beep(freq) {
        one straight after the other. Sometimes an image will be <strong>rotated</strong> away
        from the orientation you just saw.</p>
        <p>For <em>every</em> image, press:</p>
-       <ul>
-         <li>${K(rotatedKey)} if the image is <strong>rotated</strong></li>
-         <li>${K(uprightKey)} if it is in its <strong>normal orientation</strong></li>
-       </ul>
+       <ul>${keyListHtml}</ul>
        <p>Respond while the image is still on the screen. You will hear a <strong>low beep</strong>
        if you press the wrong key, and a <strong>high beep</strong> if you do not respond in time.</p>
        <p>Again, you need to press a key for <strong>every</strong> image.</p>
        <p>There will be a short break about every 7 minutes. Place your fingers on
-       ${K(EXPERIMENT.response_keys[0])} and ${K(EXPERIMENT.response_keys[1])}, then press Next to begin.</p>`,
+       ${K("f")} and ${K("j")}, then press Next for a short practice.</p>`,
     ],
     show_clickable_nav: true,
     data: { task: "instructions" },
   };
 
+  // Phase 2 #2: practice on four distinct images (original-rotated-original-rotated), each
+  // followed by feedback. Recorded as task "practice", so it never enters the exposure analysis.
+  const practiceImages = jsPsych.randomization.sampleWithoutReplacement(STIMULI, EXPERIMENT.practice_pattern.length);
+  const practiceItems = EXPERIMENT.practice_pattern.map((rotated, i) => ({ p_index: i, src: practiceImages[i], rotated }));
+  const practiceTrial = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: () => imgHtml("practice-stim", "p" + ev("p_index"), ev("src"), ev("rotated")) + feedbackSlot + exposureReminder,
+    choices: EXPERIMENT.response_keys,
+    trial_duration: EXPERIMENT.stim_ms,
+    response_ends_trial: false,
+    data: { task: "practice", p_index: tv("p_index"), stim: tv("src"), rotated: tv("rotated") },
+    on_load: () => {
+      const expected = ev("rotated") ? rotatedKey : uprightKey;
+      jsPsych.pluginAPI.getKeyboardResponse({
+        callback_function: (info) => {
+          const ok = jsPsych.pluginAPI.compareKeys(info.key, expected);
+          showEmoji(ok ? EMOJI_CORRECT : EMOJI_WRONG);
+          if (!ok) beep(EXPERIMENT.beep_wrong_hz);
+        },
+        valid_responses: EXPERIMENT.response_keys, rt_method: "performance", persist: false, allow_held_key: false,
+      });
+    },
+    on_finish: (data) => {
+      const expected = data.rotated ? rotatedKey : uprightKey;
+      data.timed_out = data.response === null;
+      data.correct = !data.timed_out && jsPsych.pluginAPI.compareKeys(data.response, expected);
+      if (data.timed_out) beep(EXPERIMENT.beep_slow_hz);
+      delete data.stimulus;
+    },
+  };
+  const practiceFeedback = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: () => {
+      const last = jsPsych.data.get().filter({ task: "practice" }).last(1).values()[0];
+      const orientation = last.rotated ? "<strong>rotated</strong>" : "in its <strong>normal orientation</strong>";
+      const right = last.rotated ? rotatedKey : uprightKey;
+      const head = last.correct ? `<p class="practice-fb ok">${EMOJI_CORRECT} Correct!</p>`
+        : last.timed_out ? `<p class="practice-fb bad">Too slow: please respond while the image is on the screen.</p>`
+        : `<p class="practice-fb bad">${EMOJI_WRONG} Not quite.</p>`;
+      return `<div class="practice-feedback">${head}
+        <p class="thanks">That image was ${orientation}, so the right key was ${K(right)}.</p></div>`;
+    },
+    choices: "NO_KEYS",
+    trial_duration: EXPERIMENT.practice_feedback_ms,
+    data: { task: "practice_feedback" },
+  };
+  const practiceEnd = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: () => {
+      const n = jsPsych.data.get().filter({ task: "practice", correct: true }).count();
+      return `<h2>Practice complete</h2>
+        <p class="thanks">You got ${n} of ${practiceItems.length} right.</p>
+        <p class="thanks">Remember: ${keySentence}. Respond to <strong>every</strong> image.</p>
+        <p class="thanks">Press Start when you are ready to begin Part 1.</p>`;
+    },
+    choices: ["Start"],
+    data: { task: "practice_end" },
+  };
+  const practice = [{ timeline: [practiceTrial, practiceFeedback], timeline_variables: practiceItems }, practiceEnd];
+
   // Exposure trial: the plugin records the first key press; an extra listener beeps the
-  // moment a wrong key is pressed, and on_finish beeps for no response at stimulus offset.
-  const tv = (name) => jsPsych.timelineVariable(name);
-  const ev = (name) => jsPsych.evaluateTimelineVariable(name);
+  // moment a wrong key is pressed (and shows the emoji, Phase 2 #4), and on_finish beeps for
+  // no response at stimulus offset.
   const exposureTrial = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: () => stimHtml("exposure-stim", ev("seq_index"), ev("node"), ev("rotated")),
+    stimulus: () => hudHtml() + stimHtml("exposure-stim", ev("seq_index"), ev("node"), ev("rotated")) +
+      feedbackSlot + exposureReminder,
     choices: EXPERIMENT.response_keys,
     trial_duration: EXPERIMENT.stim_ms,
     response_ends_trial: false,
@@ -409,7 +542,11 @@ function beep(freq) {
       const expected = ev("rotated") ? rotatedKey : uprightKey;
       jsPsych.pluginAPI.getKeyboardResponse({
         callback_function: (info) => {
-          if (!jsPsych.pluginAPI.compareKeys(info.key, expected)) beep(EXPERIMENT.beep_wrong_hz);
+          const ok = jsPsych.pluginAPI.compareKeys(info.key, expected);
+          showEmoji(ok ? EMOJI_CORRECT : EMOJI_WRONG);
+          if (!ok) beep(EXPERIMENT.beep_wrong_hz);
+          if (ok) { game.score += 1; game.streak += 1; } else game.streak = 0;
+          updateHud();
         },
         valid_responses: EXPERIMENT.response_keys,
         rt_method: "performance",
@@ -421,28 +558,85 @@ function beep(freq) {
       const expected = data.rotated ? rotatedKey : uprightKey;
       data.timed_out = data.response === null;
       data.correct = !data.timed_out && jsPsych.pluginAPI.compareKeys(data.response, expected);
-      if (data.timed_out) beep(EXPERIMENT.beep_slow_hz);
+      if (data.timed_out) { beep(EXPERIMENT.beep_slow_hz); game.streak = 0; }
+      game.done += 1;
+      data.level = game.level;
       delete data.stimulus; // the image is identified by `stim`; the HTML only bloats the data
     },
   };
 
+  // End of a level (Phase 2 #5): score for the level, compared with the previous level and
+  // with the best so far. Without gamify this is the Phase 1 break screen (keys now F first).
+  const levelResult = () => {
+    const score = game.score;
+    const prev = game.scores.length ? game.scores[game.scores.length - 1] : null;
+    const best = game.scores.length ? Math.max(...game.scores) : null;
+    return { score, prev, best, beat_previous: prev !== null && score > prev, new_best: best !== null && score > best };
+  };
+  const levelHtml = (r, lvl) => {
+    if (!EXPERIMENT.gamify) return "";
+    const pct = Math.round((100 * r.score) / levelSize(lvl));
+    let banner = "";
+    if (r.new_best) banner = `<p class="banner best">\u{1F3C6} New personal best! \u{1F3C6}</p>`;
+    else if (r.beat_previous) banner = `<p class="banner beat">⬆️ You beat your last level!</p>`;
+    return `<h2>Level ${lvl} of ${nLevels} complete</h2>${banner}
+      <p class="thanks">Score: <strong>${r.score}</strong> of ${levelSize(lvl)} (${pct}% correct)` +
+      (r.prev !== null ? ` &nbsp;|&nbsp; last level: ${r.prev} &nbsp;|&nbsp; best: ${Math.max(r.best, r.score)}` : "") +
+      `</p>`;
+  };
+  const startNextLevel = () => { game.scores.push(game.score); game.level += 1; game.score = 0; game.streak = 0; game.done = 0; };
+  const celebrate = (r) => {
+    if (!EXPERIMENT.gamify) return;
+    if (r.new_best) {
+      tune(TUNE_NEW_BEST);
+      const box = document.createElement("div");
+      box.className = "confetti";
+      box.innerHTML = Array.from({ length: 24 }, (_, i) =>
+        `<span style="left:${(i * 37) % 100}%;animation-delay:${(i % 6) * 0.12}s">${["\u{1F389}", "⭐", "✨"][i % 3]}</span>`).join("");
+      jsPsych.getDisplayElement().appendChild(box);
+    } else if (r.beat_previous) tune(TUNE_BEAT_PREVIOUS);
+  };
+
+  let lastResult = null;
   const breakScreen = (phaseName, done, total) => ({
     type: jsPsychHtmlButtonResponse,
-    stimulus: `<h2>Break</h2>
+    stimulus: () => {
+      lastResult = levelResult();
+      return levelHtml(lastResult, game.level) + `<h2>Break</h2>
       <p class="thanks">You have finished ${done} of ${total} images in ${phaseName}.
-      Take a short break if you like. As a reminder, as you continue the session, press ${K(rotatedKey)} if the image is rotated and ${K(uprightKey)} if it is in its normal orientation. 
-      Press Continue when you are ready.</p>`,
+      Take a short break if you like. As a reminder, as you continue the session, press ${keySentence}.
+      Press Continue when you are ready.</p>`;
+    },
     choices: ["Continue"],
     data: { task: "break", phase: phaseName, after_trials: done },
+    on_load: () => celebrate(lastResult),
+    on_finish: (data) => {
+      Object.assign(data, { level: game.level, level_score: lastResult.score,
+        beat_previous: lastResult.beat_previous, new_best: lastResult.new_best });
+      startNextLevel();
+    },
   });
+  // After the last level there is no break, so its result gets a screen of its own.
+  const finalLevelScreen = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: () => { lastResult = levelResult(); return levelHtml(lastResult, game.level) + `<p class="thanks">Part 1 is over. Press Continue.</p>`; },
+    choices: ["Continue"],
+    data: { task: "level_end" },
+    on_load: () => celebrate(lastResult),
+    on_finish: (data) => {
+      Object.assign(data, { level: game.level, level_score: lastResult.score,
+        beat_previous: lastResult.beat_previous, new_best: lastResult.new_best });
+    },
+  };
 
-  // Split the walk into segments with a break between them.
+  // Split the walk into segments (levels) with a break between them.
   const exposurePhase = [];
   for (let start = 0; start < exposureItems.length; start += EXPERIMENT.break_every) {
     const seg = exposureItems.slice(start, start + EXPERIMENT.break_every);
     if (start > 0) exposurePhase.push(breakScreen("Part 1", start, exposureItems.length));
     exposurePhase.push({ timeline: [exposureTrial], timeline_variables: seg });
   }
+  if (EXPERIMENT.gamify) exposurePhase.push(finalLevelScreen);
 
   // -------------------------------------------------------------------------
   // 5. Parsing phase: spacebar at "natural breaking points"
@@ -463,7 +657,7 @@ function beep(freq) {
 
   const parsingTrial = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: () => stimHtml("parse-stim", ev("seq_index"), ev("node"), false),
+    stimulus: () => stimHtml("parse-stim", ev("seq_index"), ev("node"), false) + feedbackSlot + parsingReminder,
     choices: [" "],
     trial_duration: EXPERIMENT.stim_ms,
     response_ends_trial: false,
@@ -472,6 +666,13 @@ function beep(freq) {
       stim: tv("stim"), block: tv("block"), block_pos: tv("block_pos"),
       walk_type: tv("walk_type"), direction: tv("direction"),
       community_change: tv("community_change"), prev_run: tv("prev_run"),
+    },
+    // Phase 2 #4: scissors on the first spacebar press (the one the plugin records).
+    on_load: () => {
+      jsPsych.pluginAPI.getKeyboardResponse({
+        callback_function: () => showEmoji(EMOJI_PARSE),
+        valid_responses: [" "], rt_method: "performance", persist: false, allow_held_key: false,
+      });
     },
     on_finish: (data) => {
       data.parsed = data.response !== null;
@@ -522,6 +723,7 @@ function beep(freq) {
     instructions,
     demographics,
     exposureInstructions,
+    ...practice,
     ...exposurePhase,
     parsingInstructions,
     parsingPhase,

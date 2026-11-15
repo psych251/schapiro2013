@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="-150 -150 300 300">
+<defs>
+  <radialGradient id="bg13" cx="0" cy="0" r="148" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="hsla(0,0%,98.4%,1.00)"/>
+    <stop offset="1" stop-color="hsla(0,0%,16.2%,1.00)"/>
+  </radialGradient>
+  <clipPath id="disc13"><circle r="148"/></clipPath>
+  <g id="m13">
+<ellipse cx="-53.0" cy="72.7" rx="42.1" ry="11.1" transform="rotate(95.2 -53.0 72.7)" fill="hsla(0,0%,72.0%,0.68)"/>
+<ellipse cx="-91.7" cy="58.3" rx="38.4" ry="20.6" transform="rotate(170.5 -91.7 58.3)" fill="hsla(0,0%,14.5%,0.72)"/>
+<path d="M -14.0 17.6 C 45.6 57.0, 68.3 -86.0, -77.8 -97.0" fill="none" stroke="hsla(0,0%,93.8%,0.90)" stroke-width="2.1" stroke-linecap="round"/>
+<path d="M 29.7 2.1 C 56.3 -44.5, -9.9 -118.4, -103.1 -95.6" fill="none" stroke="hsla(0,0%,90.0%,0.90)" stroke-width="7.5" stroke-linecap="round"/>
+<circle cx="6.5" cy="75.9" r="11.4" fill="hsla(0,0%,97.8%,0.95)"/>
+<circle cx="18.6" cy="44.5" r="10.5" fill="hsla(0,0%,92.2%,0.95)"/>
+  </g>
+</defs>
+<g clip-path="url(#disc13)">
+<circle r="148" fill="url(#bg13)"/>
+<use href="#m13" transform="rotate(0.0)"/>
+<use href="#m13" transform="rotate(180.0)"/>
+<circle r="94.0" fill="none" stroke="hsla(0,0%,2.5%,0.80)" stroke-width="3.8"/>
+<circle r="110.2" fill="none" stroke="hsla(0,0%,16.8%,0.80)" stroke-width="3.0"/>
+</g>
+<circle r="148" fill="none" stroke="hsla(0,0%,30.0%,1.00)" stroke-width="1.5"/>
+</svg>
