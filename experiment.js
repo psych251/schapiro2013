@@ -418,7 +418,7 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
 
   // Phase 2 #5 (optional): levels, score and streak. One level per exposure block.
   const nLevels = Math.ceil(EXPERIMENT.n_exposure / EXPERIMENT.break_every);
-  const game = { level: 1, score: 0, streak: 0, done: 0, scores: [] };
+  const game = { level: 1, score: 0, streak: 0, best_streak: 0, done: 0, scores: [] };
   const levelSize = (lvl) => Math.min(EXPERIMENT.break_every, EXPERIMENT.n_exposure - (lvl - 1) * EXPERIMENT.break_every);
   const hudHtml = () => {
     if (!EXPERIMENT.gamify) return "";
@@ -454,10 +454,7 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
        <p>For <em>every</em> image, press:</p>
        <ul>${keyListHtml}</ul>
        <p>Respond while the image is still on the screen. You will hear a <strong>low beep</strong>
-       if you press the wrong key, and a <strong>high beep</strong> if you do not respond in time.</p>
-       <p>Again, you need to press a key for <strong>every</strong> image.</p>
-       <p>There will be a short break about every 7 minutes. Place your fingers on
-       ${K("f")} and ${K("j")}, then press Next for a short practice.</p>`,
+       if you press the wrong key, and a <strong>high beep</strong> if you do not respond in time.</p>`,
     ],
     show_clickable_nav: true,
     data: { task: "instructions" },
@@ -516,12 +513,24 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
       return `<h2>Practice complete</h2>
         <p class="thanks">You got ${n} of ${practiceItems.length} right.</p>
         <p class="thanks">Remember: ${keySentence}. Respond to <strong>every</strong> image.</p>
-        <p class="thanks">Press Start when you are ready to begin Part 1.</p>`;
+        <p class="thanks">Now, it's time to begin the real study, part 1!
+        <p class="thanks">Part 1 has ${nLevels} stages, each stage lasting about ${Math.round((EXPERIMENT.break_every * EXPERIMENT.stim_ms) / 60000)} minutes. There will be short breaks between stages.</p>
+        <p class="thanks"> <strong>Are you ready?</strong> Press Start when you are ready to begin Part 1.</p>`;
     },
     choices: ["Start"],
     data: { task: "practice_end" },
   };
-  const practice = [{ timeline: [practiceTrial, practiceFeedback], timeline_variables: practiceItems }, practiceEnd];
+  const practiceIntro = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: () => `<h2>Practice</h2>
+      <p class="thanks">Let's start with a practice round! Again, ` +
+      keysInOrder.map((k) => `press ${K(k)} if you think the image is ${k === rotatedKey ? "<strong>rotated</strong>" : "in its <strong>normal orientation</strong>"}`).join(" and ") +
+      `.</p>
+      <p class="thanks">Place your fingers on ${K("f")} and ${K("j")}, then press Next for a short practice.</p>`,
+    choices: ["Next"],
+    data: { task: "practice_intro" },
+  };
+  const practice = [practiceIntro, { timeline: [practiceTrial, practiceFeedback], timeline_variables: practiceItems }, practiceEnd];
 
   // Exposure trial: the plugin records the first key press; an extra listener beeps the
   // moment a wrong key is pressed (and shows the emoji, Phase 2 #4), and on_finish beeps for
@@ -545,7 +554,8 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
           const ok = jsPsych.pluginAPI.compareKeys(info.key, expected);
           showEmoji(ok ? EMOJI_CORRECT : EMOJI_WRONG);
           if (!ok) beep(EXPERIMENT.beep_wrong_hz);
-          if (ok) { game.score += 1; game.streak += 1; } else game.streak = 0;
+          if (ok) { game.score += 1; game.streak += 1; game.best_streak = Math.max(game.best_streak, game.streak); }
+          else game.streak = 0;
           updateHud();
         },
         valid_responses: EXPERIMENT.response_keys,
@@ -571,7 +581,7 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
     const score = game.score;
     const prev = game.scores.length ? game.scores[game.scores.length - 1] : null;
     const best = game.scores.length ? Math.max(...game.scores) : null;
-    return { score, prev, best, beat_previous: prev !== null && score > prev, new_best: best !== null && score > best };
+    return { score, best_streak: game.best_streak, prev, best, beat_previous: prev !== null && score > prev, new_best: best !== null && score > best };
   };
   const levelHtml = (r, lvl) => {
     if (!EXPERIMENT.gamify) return "";
@@ -582,9 +592,12 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
     return `<h2>Level ${lvl} of ${nLevels} complete</h2>${banner}
       <p class="thanks">Score: <strong>${r.score}</strong> of ${levelSize(lvl)} (${pct}% correct)` +
       (r.prev !== null ? ` &nbsp;|&nbsp; last level: ${r.prev} &nbsp;|&nbsp; best: ${Math.max(r.best, r.score)}` : "") +
-      `</p>`;
+      `</p><p class="thanks">Longest streak: <strong>${r.best_streak}</strong> in a row</p>`;
   };
-  const startNextLevel = () => { game.scores.push(game.score); game.level += 1; game.score = 0; game.streak = 0; game.done = 0; };
+  const startNextLevel = () => {
+    game.scores.push(game.score); game.level += 1;
+    game.score = 0; game.streak = 0; game.best_streak = 0; game.done = 0;
+  };
   const celebrate = (r) => {
     if (!EXPERIMENT.gamify) return;
     if (r.new_best) {
@@ -611,7 +624,7 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
     data: { task: "break", phase: phaseName, after_trials: done },
     on_load: () => celebrate(lastResult),
     on_finish: (data) => {
-      Object.assign(data, { level: game.level, level_score: lastResult.score,
+      Object.assign(data, { level: game.level, level_score: lastResult.score, best_streak: lastResult.best_streak,
         beat_previous: lastResult.beat_previous, new_best: lastResult.new_best });
       startNextLevel();
     },
@@ -624,7 +637,7 @@ const TUNE_NEW_BEST = [523, 659, 784, 1047, 784, 1047]; // C5 E5 G5 C6 G5 C6
     data: { task: "level_end" },
     on_load: () => celebrate(lastResult),
     on_finish: (data) => {
-      Object.assign(data, { level: game.level, level_score: lastResult.score,
+      Object.assign(data, { level: game.level, level_score: lastResult.score, best_streak: lastResult.best_streak,
         beat_previous: lastResult.beat_previous, new_best: lastResult.new_best });
     },
   };

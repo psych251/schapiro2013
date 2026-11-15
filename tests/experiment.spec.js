@@ -14,7 +14,7 @@ const { test, expect, devices } = require("@playwright/test");
 
 const EMULATOR = process.env.EMULATOR === "1" || !!process.env.FIRESTORE_EMULATOR_HOST;
 const PROJECT = "demo-psych251";
-const EXPERIMENT_ID = "schapiro2013-phase2";
+const EXPERIMENT_ID = "schapiro2013-phase2-pilot";
 const FS = `http://localhost:8080/v1/projects/${PROJECT}/databases/(default)/documents`;
 
 // A short version of the study so the robot finishes in seconds: 12 exposure images with a
@@ -54,6 +54,9 @@ async function runThroughExperiment(page, { stopBeforeFinish = false, demographi
   expect(keyList.map((t) => t.trim()[0])).toEqual(["F", "J"]);
   await page.locator("#jspsych-instructions-next").click();
   const keys = await page.evaluate(() => window.__exp);
+  // Practice intro: restates the keys in F-then-J order.
+  await expect(page.getByText("Let's start with a practice round!")).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click();
   // Phase 2 #2: four practice images (original-rotated-original-rotated), each followed by
   // feedback. The robot gets the first one wrong to see both kinds of feedback.
   for (let i = 0; i < 4; i++) {
@@ -74,6 +77,8 @@ async function runThroughExperiment(page, { stopBeforeFinish = false, demographi
     if (i > 0 && i % SHORT.break_every === 0) {
       // Phase 2 #5: end-of-level feedback on the break screen.
       await expect(page.getByText("Level 1 of 2 complete")).toBeVisible();
+      // The robot answers every image correctly, so its longest streak is the whole level.
+      await expect(page.getByText(`Longest streak: ${SHORT.break_every} in a row`)).toBeVisible();
       await page.getByRole("button", { name: "Continue" }).click();
     }
     const stim = page.locator(`.exposure-stim[data-seq="${i}"]`);
