@@ -1,0 +1,343 @@
+---
+title: "Reproducibility check: Rios et al. (2024)"
+author: "Suhee Cho"
+date: today
+format:
+  html:
+    toc: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Article
+
+- **Citation and DOI:** Rios, K., Finkelshteyn, S., Markman, K.D. et al. Jewish Americans’ identity salience and effects on attitudes toward diversity. Sci Rep 14, 21676 (2024). https://doi.org/10.1038/s41598-024-72753-w
+- **Data/materials repository URL:** https://osf.io/bhqu5
+- **Part A (known case) or Part B (a classmate's project paper):** Part B
+- **Part B only:** the classmate's project repo, and which target outcome is its key effect:
+
+## Target outcomes
+
+| # | Target outcome (quoted) | Paper value(s) |
+|---|---|---|
+| 1 | The Jewish identity salient condition–relative to the control condition – led to greater perceived personal contributions to diversity, F(1, 103) = 4.25, p = 0.042, η2p = 0.040. | F(1, 103) = 4.25, p = 0.042, η2p = 0.040 |
+| 2 | The Jewish identity salient condition–relative to the control condition – ... did not impact White privilege awareness, F(1, 103) = 0.561, p = 0.455, η2p = 0.005.| F(1, 103) = 0.561, p = 0.455, η2p = 0.005 |
+| 3 | The Jewish identity salient condition–relative to the control condition – ... did not impact ... intergroup bias, F(1, 103) = 0.032, p = 0.858, η2p = 0.0003. | F(1, 103) = 0.032, p = 0.858, η2p = 0.0003 |
+| 4 | This analysis revealed that participants whose Jewish identity had been made salient perceived themselves to make greater personal contributions to diversity, which in turn predicted lower intergroup bias (overall indirect effect: B = –2.86, SE = 1.75, 95% CI [–6.85, –0.09]). | B = –2.86, SE = 1.75, 95% CI [–6.85, –0.09] |
+
+## Materials inventory
+
+I've downloaded the experiment 3 data, `Jewish identity Experiment 3.sav` only, not the experiment 1 and 2 data. Those are required for the correlational study (the meta-analysis), but I didn't provide them to the agent because that's not the findings I aim to reproduce.
+
+| Item | Available? | Notes |
+|---|---|---|
+| Raw data | Yes | The experiment 3 data (`Jewish identity Experiment 3.sav`) has all 124 recruited participants, including the 19 participants that were excluded after being collected, with every item-level response. The file includes the manipulation question (`ming`), personal-diversity items (`Q1_1`–`Q1_5`), feeling thermometers (`therm_1`–`therm_10`), White privilege items (`Q1_1.0`–`Q1_5.0`), Jewish and White identification items (`csej_*`, `csew_*`), attention check, religion and demographics. So every exclusion can be checked by the agent. The file also includes identifying metadata (IP addresses, GPS coordinates, Prolific IDs). |
+| Processed data | Yes | The same file has the authors' computed variables including composites (`diversity`, `tmin`, `w_min` = intergroup bias, `wlgbt`, `wptotal`, `csej`, `csew`), the condition variable `cond`, the SPSS exclusion filter (`filter_$`), and regression diagnostics (`ZRE_1`, `COO_1` = Cook's D used for the outlier exclusion). There is no separate cleaned file restricted to the analyzed sample. |
+| Codebook / variable descriptions | Partially yes | No separate codebook was provided. However, the SPSS variable labels give the full question text for each item and short descriptions of the computed variables (e.g., `w_min` "intergroup bias (warmth toward Whites - minorities)"). Value labels give response scales and `cond` coding (0 = control, 1 = minority identity salient). |
+| Analysis code | No | No SPSS syntax, PROCESS settings or scripts was provided. The filter label shows the exclusion rule (`religion=4 & attcheck=3 & ming ~= 2 & coo_1 < .045`), but nothing shows which sample each analysis used. |
+| Preregistration | Yes | The paper says Experiment 3 was preregistered at https://osf.io/gh3nx (and the correlational study, which I don't reproduce here, at https://osf.io/wpvhc). |
+
+## Reproduction
+
+The analyses below follow the Experiment 3 results in the order the paper reports them: the
+Methods descriptives (p. 8), Table 4 (Exp 3 columns), the condition effects, the condition →
+personal diversity → intergroup bias mediation, Tables 5–7, the Jewish identification mediation,
+and the exploratory religiosity analyses (pp. 4–5). The meta-analysis across the three
+experiments is out of scope because only the Experiment 3 data are in `ps3/Part B/data/`.
+
+The data file contains identifying Qualtrics metadata (IP address, GPS coordinates, Prolific
+IDs). The load chunk keeps only the variables the analysis needs, so none of these appear in
+the report.
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(haven)  # read SPSS .sav files
+library(knitr)
+library(psych)  # Cronbach's alpha
+
+# One paper-vs-reproduced comparison row
+cmp <- function(target, paper, reproduced) tibble(target, paper, reproduced)
+f2 <- function(x) sprintf("%.2f", x)
+```
+
+```{r}
+#| label: load
+raw <- read_sav("ps3/Part B/data/Jewish identity Experiment 3.sav")
+nrow(raw)  # paper: "One hundred and twenty-four individuals ... participated"
+
+d <- raw %>%
+  select(cond, ming, religion, attcheck, age, gender, polviews, religiosity, services,
+         starts_with("Q1_"), starts_with("therm_"), starts_with("csej_"), starts_with("csew_"),
+         diversity, tmin, w_min, wlgbt, wptotal, csej, csew,
+         COO_1, filter_author = `filter_$`) %>%
+  mutate(across(where(is.labelled), ~ as.vector(.x)))
+```
+
+```{r}
+#| label: preprocess
+# --- Exclusions, rebuilt from the Methods (p. 8) rather than taken from the authors' filter ---
+# religion: 4 = Jewish; attcheck: 3 = "Yellow" (correct); ming: 2 = "No" minority group
+ex <- d %>%
+  mutate(not_jewish = religion != 4,
+         failed_att = !not_jewish & attcheck != 3,
+         no_minority = !not_jewish & !failed_att & cond == 1 & ming == 2)
+kable(tibble(reason = c("Religion not Jewish", "Failed attention check",
+                        "Salient condition, no minority group"),
+             paper = c(9, 2, 3),
+             reproduced = c(sum(ex$not_jewish), sum(ex$failed_att), sum(ex$no_minority))))
+
+d110 <- ex %>% filter(!not_jewish, !failed_att, !no_minority)
+nrow(d110)
+
+# Cook's D outliers. The authors' saved COO_1 values come from lm(diversity ~ cond)
+# fitted on these 110 participants: refit and confirm before using it.
+cook <- cooks.distance(lm(diversity ~ cond, data = d110))
+max(abs(cook - d110$COO_1))  # ~0: identical to the authors' saved values
+sum(cook > .045)             # paper: 5 outliers with Cook's D > .045
+
+d105 <- d110[cook <= .045, ]
+nrow(d105)                   # paper: final N = 105
+
+# Same participants as the authors' SPSS filter
+# ("religion=4 & attcheck=3 & ming ~= 2 & coo_1 < .045")?
+identical(which(d$filter_author == 1),
+          which(d$religion == 4 & d$attcheck == 3 & !(d$cond == 1 & d$ming == 2) &
+                  d$COO_1 < .045))
+
+# --- Composites: rebuild from items and check against the authors' saved scores ---
+# Reverse-keyed items (Q1_4.0; csej/csew 1, 3, 8) are already reverse-scored in the file:
+# reversing them again does not match the saved scores and yields alphas near 0.
+rebuilt <- d105 %>%
+  transmute(diversity = rowMeans(across(Q1_1:Q1_5)),
+            tmin = rowMeans(across(therm_2:therm_6)),  # Black, Latino, Asian, Middle Eastern, Native
+            w_min = therm_1 - tmin,                    # White minus minorities = intergroup bias
+            wlgbt = rowMeans(across(therm_7:therm_10)),
+            wptotal = rowMeans(across(Q1_1.0:Q1_5.0)),
+            csej = rowMeans(across(csej_1:csej_8)),
+            csew = rowMeans(across(csew_1:csew_8)))
+sapply(names(rebuilt), \(v) max(abs(rebuilt[[v]] - d105[[v]])))  # all 0
+```
+
+```{r}
+#| label: analysis-descriptives
+# Methods (p. 8): sample description and scale descriptives, N = 105
+alpha_of <- function(df) psych::alpha(df, warnings = FALSE)$total$raw_alpha
+msd <- function(x) sprintf("M = %.2f, SD = %.2f", mean(x), sd(x))
+msd_a <- function(x, items) paste0(msd(x), "; α = ", f2(alpha_of(items)))
+
+table(gender = factor(d105$gender, 1:6, c("man", "woman", "trans man", "trans woman",
+                                          "non-binary", "other")))
+kable(bind_rows(
+  cmp("Age", "M = 42.70, SD = 16.51", msd(d105$age)),
+  cmp("Political views", "M = 2.53, SD = 1.57", msd(d105$polviews)),
+  cmp("Personal contributions to diversity", "M = 4.14, SD = 1.18; α = .82",
+      msd_a(d105$diversity, select(d105, Q1_1:Q1_5))),
+  cmp("Warmth: White Americans", "M = 66.93, SD = 24.16", msd(d105$therm_1)),
+  cmp("Warmth: racial/ethnic minorities", "M = 74.16, SD = 19.45; α = .94",
+      msd_a(d105$tmin, select(d105, therm_2:therm_6))),
+  cmp("Intergroup bias composite", "M = -7.23, SD = 24.34", msd(d105$w_min)),
+  cmp("LGBT composite", "M = 70.62, SD = 24.13; α = .93",
+      msd_a(d105$wlgbt, select(d105, therm_7:therm_10))),
+  cmp("White privilege awareness", "M = 5.53, SD = 1.60; α = .96",
+      msd_a(d105$wptotal, select(d105, Q1_1.0:Q1_5.0))),
+  cmp("Jewish identification", "M = 5.24, SD = 1.19; α = .91",
+      msd_a(d105$csej, select(d105, csej_1:csej_8))),
+  cmp("White identification", "M = 3.26, SD = 1.29; α = .89",
+      msd_a(d105$csew, select(d105, csew_1:csew_8)))))
+```
+
+```{r}
+#| label: analysis-table4
+# Table 4, Experiment 3 columns: M (SD) [95% CI] by condition.
+# The paper's CIs use the pooled ANOVA error term (SPSS EMMEANS style),
+# not separate per-group t-based CIs.
+tab4_rows <- function(v, label) {
+  ci <- confint(lm(d105[[v]] ~ 0 + factor(d105$cond)))
+  d105 %>%
+    group_by(cond) %>%
+    summarise(n = n(), M = mean(.data[[v]]), SD = sd(.data[[v]])) %>%
+    mutate(measure = label, lo = ci[, 1], hi = ci[, 2])
+}
+tab4 <- bind_rows(tab4_rows("w_min", "Intergroup bias"),
+                  tab4_rows("diversity", "Personal diversity"),
+                  tab4_rows("wptotal", "White privilege")) %>%
+  mutate(condition = if_else(cond == 1, "Jewish identity salient", "Control"),
+         reproduced = sprintf("%.2f (%.2f) [%.2f, %.2f]", M, SD, lo, hi),
+         paper = c("-6.80 (27.26) [-13.47, -0.14]", "-7.66 (21.21) [-14.39, -0.94]",
+                   "3.91 (1.14) [3.60, 4.23]",      "4.38 (1.18) [4.06, 4.70]",
+                   "5.41 (1.66) [4.97, 5.85]",      "5.65 (1.55) [5.21, 6.09]"))
+kable(select(tab4, measure, condition, n, paper, reproduced))
+```
+
+```{r}
+#| label: analysis-condition-effects
+# One-way ANOVAs of condition on each outcome, N = 105
+cond_F <- function(v) {
+  a <- anova(lm(d105[[v]] ~ factor(d105$cond)))
+  sprintf("F(%d, %d) = %.3f, p = %.3f, η²p = %.4f", a$Df[1], a$Df[2], a$`F value`[1],
+          a$`Pr(>F)`[1], a$`Sum Sq`[1] / sum(a$`Sum Sq`))
+}
+kable(bind_rows(
+  cmp("Condition → personal diversity", "F(1, 103) = 4.25, p = 0.042, η²p = 0.040",
+      cond_F("diversity")),
+  cmp("Condition → White privilege", "F(1, 103) = 0.561, p = 0.455, η²p = 0.005",
+      cond_F("wptotal")),
+  cmp("Condition → intergroup bias", "F(1, 103) = 0.032, p = 0.858, η²p = 0.0003",
+      cond_F("w_min"))))
+```
+
+```{r}
+#| label: analysis-mediation-condition
+# PROCESS model 4 equivalent: a = X -> M, b = M -> Y controlling for X; indirect = a * b.
+# Percentile bootstrap with 5000 resamples, as in the paper.
+# Bootstrap SE and CI depend on the random seed (checked below).
+boot_indirect <- function(dat, x, m, y, cov = NULL, R = 5000, seed = 251) {
+  Xa <- cbind(1, as.matrix(dat[, c(x, cov)]))     # a path: M ~ X (+ cov)
+  Xb <- cbind(1, as.matrix(dat[, c(x, m, cov)]))  # b path: Y ~ X + M (+ cov)
+  M <- dat[[m]]; Y <- dat[[y]]
+  ab <- function(i) unname(lm.fit(Xa[i, , drop = FALSE], M[i])$coef[2] *
+                           lm.fit(Xb[i, , drop = FALSE], Y[i])$coef[3])
+  set.seed(seed)
+  bs <- replicate(R, ab(sample(nrow(dat), replace = TRUE)))
+  c(B = ab(seq_len(nrow(dat))), SE = sd(bs),
+    lo = unname(quantile(bs, .025)), hi = unname(quantile(bs, .975)))
+}
+fmt_med <- function(r) sprintf("B = %.2f, SE = %.2f, 95%% CI [%.2f, %.2f]",
+                               r["B"], r["SE"], r["lo"], r["hi"])
+
+med_cond <- boot_indirect(d105, "cond", "diversity", "w_min")
+kable(cmp("Indirect effect: condition → diversity → bias (N = 105)",
+          "B = -2.86, SE = 1.75, 95% CI [-6.85, -0.09]", fmt_med(med_cond)))
+```
+
+```{r}
+#| label: analysis-tables5-7
+#| results: asis
+# Tables 5-7: outcome ~ Jewish identification + White identification.
+# Fitted on the reported final sample (N = 105) and on the pre-Cook's-D sample (N = 110).
+reg_fmt <- function(dat, y) {
+  m <- lm(reformulate(c("csej", "csew"), y), data = dat)
+  beta <- c(NA, coef(lm(scale(dat[[y]]) ~ scale(csej) + scale(csew), data = dat))[-1])
+  s <- summary(m)$coefficients
+  sprintf("%.3f (%.3f)%s, t = %.3f, p = %.3f", s[, 1], s[, 2],
+          ifelse(is.na(beta), "", sprintf(", β = %.3f", beta)), s[, 3], s[, 4])
+}
+paper_tabs <- list(
+  "Table 5: intergroup bias (w_min)" = list(y = "w_min", paper = c(
+    "-26.6 (10.57), t = -2.51, p = .013",
+    "-0.498 (1.74), β = -0.026, t = -0.286, p = .775",
+    "6.69 (1.66), β = 0.363, t = 4.03, p < .001")),
+  "Table 6: White privilege awareness (wptotal)" = list(y = "wptotal", paper = c(
+    "5.7 (0.748), t = 7.62, p < .001",
+    "-0.007 (0.123), β = -0.006, t = -0.059, p = .953",
+    "-0.030 (0.118), β = -0.024, t = -0.253, p = .801")),
+  "Table 7: personal contributions to diversity (diversity)" = list(y = "diversity", paper = c(
+    "3.31 (0.607), t = 5.46, p < .001",
+    "0.211 (0.100), β = 0.200, t = 2.12, p = .036",
+    "-0.088 (0.095), β = -0.087, t = -0.919, p = .360")))
+for (nm in names(paper_tabs)) {
+  y <- paper_tabs[[nm]]$y
+  print(kable(tibble(term = c("Constant", "Jewish identification", "White identification"),
+                     paper = paper_tabs[[nm]]$paper,
+                     `reproduced, N = 105` = reg_fmt(d105, y),
+                     `reproduced, N = 110` = reg_fmt(d110, y)),
+              caption = nm))
+  cat("\n\n")
+}
+```
+
+```{r}
+#| label: analysis-mediation-jewish-id
+# Indirect effect of Jewish identification on bias via personal diversity,
+# controlling for White identification (as in the regressions)
+med_jid_105 <- boot_indirect(d105, "csej", "diversity", "w_min", cov = "csew")
+med_jid_110 <- boot_indirect(d110, "csej", "diversity", "w_min", cov = "csew")
+kable(bind_rows(
+  cmp("Indirect effect: Jewish ID → diversity → bias (N = 105)",
+      "B = -1.00, SE = 0.56, 95% CI [-2.16, -0.003]", fmt_med(med_jid_105)),
+  cmp("Indirect effect: Jewish ID → diversity → bias (N = 110)",
+      "B = -1.00, SE = 0.56, 95% CI [-2.16, -0.003]", fmt_med(med_jid_110))))
+
+# How seed-dependent are the bootstrap CIs? 50 seeds x 5000 resamples each.
+seed_check <- function(dat, x, cov = NULL) {
+  r <- t(sapply(1:50, \(s) boot_indirect(dat, x, "diversity", "w_min", cov, seed = s)))
+  tibble(SE = sprintf("%.2f to %.2f", min(r[, "SE"]), max(r[, "SE"])),
+         lower = sprintf("%.2f to %.2f", min(r[, "lo"]), max(r[, "lo"])),
+         upper = sprintf("%.3f to %.3f", min(r[, "hi"]), max(r[, "hi"])),
+         `share of seeds with CI excluding 0` = mean(r[, "hi"] < 0))
+}
+kable(bind_rows(
+  `Condition mediation, N = 105` = seed_check(d105, "cond"),
+  `Jewish ID mediation, N = 110` = seed_check(d110, "csej", "csew"),
+  .id = "model"))
+```
+
+```{r}
+#| label: analysis-exploratory
+# Exploratory: replace Jewish identification with religiosity or service attendance
+# (controlling for White identification). Paper: "all ps ≥ 0.608".
+expl <- expand_grid(sample = c("N = 105", "N = 110"),
+                    predictor = c("religiosity", "services"),
+                    outcome = c("diversity", "w_min", "wptotal")) %>%
+  mutate(p = pmap_dbl(list(sample, predictor, outcome), \(s, x, y) {
+    dat <- if (s == "N = 105") d105 else d110
+    summary(lm(reformulate(c(x, "csew"), y), data = dat))$coefficients[x, 4]
+  }))
+kable(pivot_wider(expl, names_from = sample, values_from = p), digits = 3)
+
+# LGBT evaluations: paper reports no condition effect and no identification effects
+anova(lm(wlgbt ~ factor(cond), data = d105))
+summary(lm(wlgbt ~ csej + csew, data = d105))$coefficients
+```
+
+**Summary of what the agent found** (verdicts are left to the checker):
+
+- **Exclusions and sample.** All four exclusion counts (9, 2, 3, 5) and the final N = 105
+  reproduce from the raw responses. The Cook's D values come from `lm(diversity ~ cond)`
+  fitted on the 110 participants who survived the first three exclusions. All composite
+  scores and the Methods descriptives (Ms, SDs, alphas, gender counts) reproduce. One small
+  difference: the age SD comes out 16.52 against the reported 16.51.
+- **Table 4 and condition effects (N = 105).** Means and SDs match. The CIs match when computed
+  with the pooled ANOVA error term. Two bounds differ by 0.01, consistent with rounding
+  (intergroup bias, control lower −13.46 vs −13.47; White privilege, salient lower 5.20 vs
+  5.21). All three F tests and η²p match.
+- **Condition mediation (N = 105).** The indirect effect is B = −2.86, matching exactly. The
+  bootstrap SE and CI differ only in the second decimal, which is expected from Monte Carlo
+  variation; nearly all seeds give a CI excluding zero.
+
+## Checker's verdict
+
+The agent attempted every reported result that can be computed from the provided data, including results that are not in the Target Outcomes section and that I did not ask it to reproduce. Those additional results are not in the table below.
+
+| # | Paper value | Reproduced value | Verdict (exact / minor / major / not reproducible) | Reason for discrepancy |
+|---|---|---|---|---|
+| 1 | F(1, 103) = 4.25, p = 0.042, η2p = 0.040 | F(1, 103) = 4.25, p = 0.042, η2p = 0.040 | exact | - |
+| 2 | F(1, 103) = 0.561, p = 0.455, η2p = 0.005 | F(1, 103) = 0.561, p = 0.455, η2p = 0.005 | exact | - |
+| 3 | F(1, 103) = 0.032, p = 0.858, η2p = 0.0003 | F(1, 103) = 0.032, p = 0.858, η2p = 0.0003 | exact | - |
+| 4 | B = –2.86, SE = 1.75, 95% CI [–6.85, –0.09] | B = –2.86 (match), SE = 1.78, 95% CI [-6.90, -0.15] (minor deviation) | minor | B value matches exactly. The reported values and reproduced values of SE and CI have minor differences in the second decimal, which is expected from bootstrap resampling. |
+
+**Agent's own claim about success, and whether it was right:** The agent reported that all four target outcomes reproduced, which was correct. It also flagged discrepancies in non-target results (Tables 5–7, the Jewish identification mediation, and the exploratory analyses).
+
+
+## Time
+
+- **Your time (hours):** It took 1/6 hour (10 minutes) for me to read the paper, download the data, and direct the agent to attempt the reproduction.
+- **Agent wall-clock time (hours):** about 0.3 (roughly 15–20 minutes). This covers reading the paper's Experiment 3 sections, inspecting the data, rebuilding the exclusions and composites, working out which sample Tables 5–7 used, checking bootstrap seed sensitivity, and writing and rendering this section. Rendering the report takes about 1 minute, mostly for the 50-seed bootstrap check.
+- **Stopped at the 4-hour cap? What remained:** No. Every Experiment 3 result in the paper was attempted. This includes results I had not asked the agent to reproduce. The only Experiment 3 result not attempted is the three-experiment meta-analysis (B = −4.92, p = .026), which needs the Experiment 1 and 2 data. I did not aim to reproduce the meta-analysis results here.
+
+## Assessment
+
+**Is the primary result analytically reproducible? What would have made this take 30 minutes?:** The primary result is analytically reproducible. The reproduction took less than 30 minutes because the authors provided the raw and processed data. The most time-consuming part was reproducing Tables 5–7 of the original paper (not included in the Target Outcomes, but the agent attempted to reproduce the tables). The authors reported N = 105 following their exclusion rule, but it turned out that they used N = 110. It took the agent some time to figure this out.
+
+Another part that took time was bootstrapping the indirect effects, which is computationally heavy.
+
+## AI documentation
+
+- **Agent and interface (e.g., Claude Code, Codex CLI, Cursor):** Claude Code
+- **Model and version, if the tool reports it:** Opus 5.5
+- **Context you gave it (files, instructions, any context file):** I cloned the problem_sets repository, and provided the agent with the folder containing the article's PDF, the authors' data, and the `reproducibilityReport.Rmd` template (/ps3/Group A/Choice 1). I instructed it to reproduce the target outcomes.
+- **Number of times you intervened, and the most important intervention:** The agent was able to reproduce the target outcomes without any intervention.
+- **Transcript:** https://github.com/psych251/schapiro2013/blob/main/transcripts/Transcript_partB.txt

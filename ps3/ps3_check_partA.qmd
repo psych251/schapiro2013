@@ -1,0 +1,116 @@
+---
+title: "Reproducibility check: Joel, Teper, & MacDonald (2014)"
+author: "Suhee Cho"
+date: today
+format:
+  html:
+    toc: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+
+## Article
+
+- **Citation and DOI:** Joel S, Teper R, MacDonald G. People overestimate their willingness to reject potential romantic partners by overlooking their concern for other people. Psychol Sci. 2014 Dec;25(12):2233-40. doi: 10.1177/0956797614552828. Epub 2014 Oct 24. PMID: 25344347.
+- **Data/materials repository URL:** https://osf.io/rmx7f/
+- **Part A (known case) or Part B (a classmate's project paper):** Part A
+
+## Target outcomes
+
+| # | Target outcome (quoted) | Paper value(s) |
+|---|---|---|
+| 1 | We next tested our primary hypothesis that participants would be more reluctant to reject the unattractive date when they believed the situation to be real rather than hypothetical. Only 10 of the 61 participants in the hypothetical condition chose to exchange contact information with the unattractive potential date (16%). | 10 of the 61 participants (16%) |
+| 2 | In contrast, 26 of the 71 participants in the real condition chose to exchange contact information (37%).| 26 of the 71 participants (37%) |
+| 3 | A chi-square test of independence indicated that participants were significantly less likely to reject the unattractive potential date in the real condition compared with the hypothetical condition, X^2(1, N = 132) = 6.77, p = .009. | X^2(1, N = 132) = 6.77, p = .009 |
+
+## Materials inventory
+
+| Item | Available? | Notes |
+|---|---|---|
+| Raw data | Partially yes | `Empathy Gap Study 1 data.sav` (SPSS) has raw data of item-level responses (attachment, FOBA, empathy, motives items). However, only the 132 participants were analyzed. The 18 excluded participants are not in the file, so the exclusions cannot be checked. |
+| Processed data | Yes | `Empathy Gap Study 1 data.sav` also includes processed data, such as `EmpathyPTtot`, `attachmentavoidance`, and `otherfocused_motives`, and the analysis variables `condition` and `exchangeinfo`. |
+| Codebook / variable descriptions | Partially yes | No separate codebook is provided. The key variables have SPSS labels after a `REQUIRED_VARIABLES_START_BELOW` marker: `condition` ("Independent variable", 0 = hypothetical, 1 = real) and `exchangeinfo` ("Key DV", 1 = yes, 2 = no). Most item-level variables have no labels. |
+| Analysis code | No | No SPSS syntax or scripts were provided. However, the analysis uses a single 2x2 chi-square, so the analysis code is not needed. |
+| Preregistration | No | The article has Open Data and Open Materials badges only, with no preregistration badge or statement. |
+
+## Reproduction
+
+
+```{r}
+#| label: setup
+library(tidyverse)
+library(haven)  # read SPSS .sav files
+library(knitr)
+```
+
+```{r}
+#| label: load
+# Study 1 data from the article folder (path relative to this .qmd)
+d <- read_sav("ps3/Group A/Choice 1/data/Empathy Gap Study 1 data.sav")
+dim(d)  # 132 participants = final sample reported in the paper
+```
+
+```{r}
+#| label: preprocess
+# condition: 0 = hypothetical, 1 = real; exchangeinfo: 1 = yes, 2 = no
+d <- d %>%
+  mutate(condition = as_factor(condition),
+         exchangeinfo = as_factor(exchangeinfo))
+
+# No missing values on either variable, so no further exclusions
+c(missing_condition = sum(is.na(d$condition)),
+  missing_exchange = sum(is.na(d$exchangeinfo)))
+```
+
+```{r}
+#| label: analysis
+# Targets 1-2: counts and percentages exchanging contact info, by condition
+d %>%
+  group_by(condition) %>%
+  summarise(n = n(),
+            n_exchange = sum(exchangeinfo == "yes"),
+            pct_exchange = round(100 * mean(exchangeinfo == "yes"), 1)) %>%
+  kable()
+
+# Target 3: chi-square test of independence, no continuity correction
+tab <- table(d$condition, d$exchangeinfo)
+tab
+chi <- chisq.test(tab, correct = FALSE)
+chi
+c(X2 = round(unname(chi$statistic), 2), df = unname(chi$parameter),
+  N = sum(tab), p = round(chi$p.value, 3))
+
+# For comparison: R's default Yates correction does NOT match the paper
+chisq.test(tab, correct = TRUE)
+```
+
+## Checker's verdict
+
+| # | Paper value | Reproduced value | Verdict (exact / minor / major / not reproducible) | Reason for discrepancy |
+|---|---|---|---|---|
+| 1 | 10 of the 61 participants (16%) | 10 of 61 (16.4%) | exact | The reproduced value exactly matches the value reported in the paper. |
+| 2 | 26 of the 71 participants (37%) | 26 of 71 (36.6%) | exact | The reproduced value exactly matches the value reported in the paper. |
+| 3 | X^2(1, N = 132) = 6.77, p = .009 | X^2(1, N = 132) = 6.77, p = .009 | exact | The reproduced value exactly matches the value reported in the paper. |
+
+**Agent's own claim about success, and whether it was right:** Agent claims success, and it was correct. The agent was able to exactly reproduce all three target values.
+
+## Time
+
+- **Your time (hours):** About 0.17 hours (10 minutes) to read the paper, inspect the data, and direct the agent.
+- **Agent wall-clock time (hours):** about 0.1 (roughly 5 minutes for the agent to inspect the data, run the analysis, fill in `reproducibilityReport.Rmd`, and render it)
+- **Stopped at the 4-hour cap? What remained:** No. All three target outcomes were reproduced well far before the cap time, and nothing was remained.
+
+## Assessment
+
+**Is the primary result analytically reproducible? What would have made this take 30 minutes?:** The primary result is analytically reproducible. This takes only around 15 minutes, because the authors provided the raw and processed data, and the analysis was straightforward (a single 2x2 chi-square test). The only minor issue was that the raw data did not include the 18 excluded participants, but this did not affect the reproduction of the reported results. To reduce the time, the authors could have provided a separate codebook with clear variable descriptions and labels for all item-level variables, as well as an SPSS syntax file for the analysis.
+
+## AI documentation
+
+- **Agent and interface (e.g., Claude Code, Codex CLI, Cursor):** Claude Code
+- **Model and version, if the tool reports it:** Opus 5.5
+- **Context you gave it (files, instructions, any context file):** I cloned the problem_sets repository, and provided the agent with the folder containing the article's PDF, the authors' data, and the `reproducibilityReport.Rmd` template (/ps3/Group A/Choice 1). I instructed it to reproduce the target outcomes.
+- **Number of times you intervened, and the most important intervention:** The agent was able to reproduce the target outcomes without any intervention.
+- **Transcript:** https://github.com/psych251/schapiro2013/blob/main/transcripts/Transcript_partA.txt
